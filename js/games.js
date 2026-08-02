@@ -11,6 +11,17 @@ export function initGames(user) {
     })
 }
 
+// این تابع رو اضافه کن 👇
+function getAvatarHTML(avatar) {
+    if (!avatar) return '👤'
+    // اگه مسیر فایله یا شامل نقطه‌ست (پسوند فایل داره)
+    if (avatar.includes('/') || avatar.includes('.png') || avatar.includes('.jpg') || avatar.includes('.jpeg') || avatar.includes('.gif')) {
+        return `<img src="${avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover;">`
+    }
+    // اگه ایموجی یا تکست سادست
+    return avatar
+}
+
 function openBottleGame() {
     const currentUser = getCurrentUser()
     
@@ -58,7 +69,7 @@ function openBottleGame() {
                         --angle: ${(i / players.length) * 360}deg;
                         --color: ${p.color};
                     " title="${p.name}">
-                        <span class="player-avatar">${p.avatar}</span>
+                        <span class="player-avatar">${getAvatarHTML(p.avatar)}</span>
                         <span class="player-name">${p.name}</span>
                     </div>
                 `).join('')}
@@ -74,64 +85,52 @@ function openBottleGame() {
     const spinBtn = overlay.querySelector('#spin-btn')
     let isSpinning = false
     
-    // بستن
     overlay.querySelector('#bottle-close').addEventListener('click', () => overlay.remove())
     overlay.addEventListener('click', (e) => {
         if (e.target === overlay) overlay.remove()
     })
     
-    // چرخوندن
     spinBtn.addEventListener('click', () => {
         if (isSpinning) return
         isSpinning = true
         
-        // انتخاب تصادفی
         const randomIndex = Math.floor(Math.random() * players.length)
         const selectedPlayer = players[randomIndex]
         
-        // محاسبه چرخش - ۵ دور کامل + زاویه انتخاب شده
-        const spins = 5 // تعداد دور کامل
+        const spins = 5
         const targetAngle = (randomIndex / players.length) * 360
         const totalRotation = (spins * 360) + (360 - targetAngle) + Math.floor(Math.random() * 30)
         
-        // چرخوندن بطری
         bottle.style.transition = 'transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99)'
         bottle.style.transform = `rotate(${totalRotation}deg)`
         
-        // غیرفعال کردن دکمه
         spinBtn.disabled = true
         spinBtn.textContent = '⏳ در حال چرخش...'
         spinBtn.style.opacity = '0.7'
         
-        // پنهان کردن نتیجه قبلی
         resultDiv.classList.remove('show')
         
-        // افکت صدا (اختیاری)
         playTickSound()
         
-        // بعد از تموم شدن چرخش
         setTimeout(() => {
             bottle.style.transition = 'transform 0.3s ease'
             
-            // نمایش نتیجه
+            // اینجا هم getAvatarHTML استفاده کن 👇
             resultText.innerHTML = `
-                <span class="selected-avatar">${selectedPlayer.avatar}</span>
+                <span class="selected-avatar">${getAvatarHTML(selectedPlayer.avatar)}</span>
                 <span class="selected-name">${selectedPlayer.name}</span>
                 <span class="selected-label">انتخاب شد! 🎉</span>
             `
             resultDiv.classList.add('show')
             
-            // هایلایت کردن بازیکن انتخاب شده
             highlightPlayer(randomIndex)
             
-            // فعال کردن دکمه
             spinBtn.disabled = false
             spinBtn.textContent = '🔄 دوباره بچرخون'
             spinBtn.style.opacity = '1'
             
             isSpinning = false
             
-            // ویبره (اگه گوشی باشه)
             if (navigator.vibrate) {
                 navigator.vibrate([100, 50, 100])
             }
@@ -156,7 +155,6 @@ function openBottleGame() {
     }
     
     function playTickSound() {
-        // صدای تیک تیک ساده با Web Audio API
         try {
             const audioCtx = new (window.AudioContext || window.webkitAudioContext)()
             let tickCount = 0
@@ -182,8 +180,6 @@ function openBottleGame() {
                 
                 tickCount++
             }, 350)
-        } catch (e) {
-            // بی‌صدا ادامه بده
-        }
+        } catch (e) {}
     }
 }

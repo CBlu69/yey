@@ -11,7 +11,7 @@ let currentUser = null
 // ==================== توابع جایگزین alert و confirm ====================
 
 // جایگزین alert
-window.showAlert = function(message, type = 'info') {
+window.showAlert = function (message, type = 'info') {
     return new Promise((resolve) => {
         const icons = {
             success: '✅',
@@ -19,14 +19,14 @@ window.showAlert = function(message, type = 'info') {
             warning: '⚠️',
             info: '💬'
         }
-        
+
         const titles = {
             success: 'موفق',
             error: 'خطا',
             warning: 'هشدار',
             info: 'پیام'
         }
-        
+
         const overlay = document.createElement('div')
         overlay.className = 'modal-overlay'
         overlay.innerHTML = `
@@ -39,19 +39,19 @@ window.showAlert = function(message, type = 'info') {
                 </div>
             </div>
         `
-        
+
         document.body.appendChild(overlay)
-        
+
         const okBtn = overlay.querySelector('#alert-ok')
         okBtn.focus()
-        
+
         const close = () => {
             overlay.style.animation = 'overlayOut 0.2s ease forwards'
             overlay.querySelector('.custom-modal').style.animation = 'modalOut 0.2s ease forwards'
             setTimeout(() => overlay.remove(), 200)
             resolve()
         }
-        
+
         okBtn.addEventListener('click', close)
         overlay.addEventListener('click', (e) => {
             if (e.target === overlay) close()
@@ -66,7 +66,7 @@ window.showAlert = function(message, type = 'info') {
 }
 
 // جایگزین confirm
-window.showConfirm = function(message, title = 'مطمئنی؟') {
+window.showConfirm = function (message, title = 'مطمئنی؟') {
     return new Promise((resolve) => {
         const overlay = document.createElement('div')
         overlay.className = 'modal-overlay'
@@ -81,20 +81,20 @@ window.showConfirm = function(message, title = 'مطمئنی؟') {
                 </div>
             </div>
         `
-        
+
         document.body.appendChild(overlay)
-        
+
         const yesBtn = overlay.querySelector('#confirm-yes')
         const noBtn = overlay.querySelector('#confirm-no')
         noBtn.focus()
-        
+
         const close = (result) => {
             overlay.style.animation = 'overlayOut 0.2s ease forwards'
             overlay.querySelector('.custom-modal').style.animation = 'modalOut 0.2s ease forwards'
             setTimeout(() => overlay.remove(), 200)
             resolve(result)
         }
-        
+
         yesBtn.addEventListener('click', () => close(true))
         noBtn.addEventListener('click', () => close(false))
         overlay.addEventListener('click', (e) => {
@@ -110,7 +110,7 @@ window.showConfirm = function(message, title = 'مطمئنی؟') {
 }
 
 // جایگزین prompt
-window.showPrompt = function(message, defaultValue = '') {
+window.showPrompt = function (message, defaultValue = '') {
     return new Promise((resolve) => {
         const overlay = document.createElement('div')
         overlay.className = 'modal-overlay'
@@ -132,23 +132,23 @@ window.showPrompt = function(message, defaultValue = '') {
                 </div>
             </div>
         `
-        
+
         document.body.appendChild(overlay)
-        
+
         const input = overlay.querySelector('#prompt-input')
         const okBtn = overlay.querySelector('#prompt-ok')
         const cancelBtn = overlay.querySelector('#prompt-cancel')
-        
+
         input.focus()
         input.select()
-        
+
         const close = (result) => {
             overlay.style.animation = 'overlayOut 0.2s ease forwards'
             overlay.querySelector('.custom-modal').style.animation = 'modalOut 0.2s ease forwards'
             setTimeout(() => overlay.remove(), 200)
             resolve(result)
         }
-        
+
         okBtn.addEventListener('click', () => close(input.value.trim()))
         cancelBtn.addEventListener('click', () => close(null))
         input.addEventListener('keypress', (e) => {
@@ -161,30 +161,30 @@ window.showPrompt = function(message, defaultValue = '') {
 }
 
 // Toast notification
-window.showToast = function(message, type = 'info', duration = 3000) {
+window.showToast = function (message, type = 'info', duration = 3000) {
     const icons = {
         success: '✅',
         error: '❌',
         warning: '⚠️',
         info: '💬'
     }
-    
+
     let container = document.querySelector('.toast-container')
     if (!container) {
         container = document.createElement('div')
         container.className = 'toast-container'
         document.body.appendChild(container)
     }
-    
+
     const toast = document.createElement('div')
     toast.className = `toast ${type}`
     toast.innerHTML = `
         <span class="toast-icon">${icons[type]}</span>
         <span>${message}</span>
     `
-    
+
     container.appendChild(toast)
-    
+
     setTimeout(() => {
         toast.style.animation = 'toastOut 0.3s ease forwards'
         setTimeout(() => toast.remove(), 300)
@@ -195,28 +195,35 @@ window.showToast = function(message, type = 'info', duration = 3000) {
 function handleTabs() {
     const navItems = document.querySelectorAll('.nav-item')
     const tabPanes = document.querySelectorAll('.tab-pane')
-    
+
     navItems.forEach(item => {
         item.addEventListener('click', () => {
             const tabName = item.dataset.tab
-            
+
             navItems.forEach(nav => nav.classList.remove('active'))
             item.classList.add('active')
-            
+
             tabPanes.forEach(pane => pane.classList.remove('active'))
-            
+
             const targetPane = document.getElementById(`tab-${tabName}`)
             if (targetPane) {
                 targetPane.classList.add('active')
+
+                // 👇 اینو اضافه کن - رفع مشکل نقشه توی تب مخفی
+                if (tabName === 'map') {
+                    setTimeout(() => {
+                        const m = window.getMap?.()
+                        if (m) m.invalidateSize()
+                    }, 200)
+                }
             }
         })
     })
 }
-
 // ==================== راه‌اندازی ماژول‌ها ====================
 function initAllModules(user) {
     if (!user) return
-    
+
     try {
         initChat(user)
         initMap(user)
@@ -243,7 +250,7 @@ if (logoutBtn) {
 document.addEventListener('DOMContentLoaded', async () => {
     try {
         currentUser = await initAuth()
-        
+
         if (currentUser) {
             handleTabs()
             initAllModules(currentUser)
