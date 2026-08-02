@@ -1,27 +1,42 @@
 <!DOCTYPE html>
 <html lang="fa" dir="rtl">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>اپ دوستانه ما</title>
+    <title>Yey</title>
+
+    <!-- Favicon -->
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍕</text></svg>">
+
+    <!-- Styles -->
     <link rel="stylesheet" href="css/style.css">
-    <!-- Supabase -->
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <!-- Leaflet برای نقشه -->
+
+    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </head>
+
 <body>
-    <!-- صفحه احراز هویت -->
+    <!-- صفحه ورود - ساده و تمیز -->
     <div id="auth-screen" class="screen active">
-        <div class="auth-container">
-            <h1>👋 به اپ دوستانه خوش اومدی</h1>
-            <form id="auth-form">
-                <input type="email" id="email" placeholder="ایمیلت رو وارد کن" required>
-                <input type="password" id="password" placeholder="رمز عبور" required>
-                <button type="submit" id="login-btn">ورود</button>
-                <button type="button" id="signup-btn">ثبت نام</button>
-            </form>
+        <div class="auth-container" id="auth-container">
+            <div class="auth-logo">
+                <img src="assets/logo.png" alt="logo"
+                    style="width:100%; height:100%; object-fit:cover; border-radius:18px;">
+            </div>
+            <p class="subtitle">اسمت رو وارد کن</p>
+
+            <div class="input-wrapper">
+                <input type="text" id="nickname-input" placeholder="اسمت رو بنویس..." autocomplete="off" maxlength="20"
+                    autofocus>
+            </div>
+
+            <button id="type-login-btn" class="login-btn">ورود</button>
+
+            <div id="login-message" class="login-message"></div>
+
+            <p class="auth-footer">🔒 فقط دوستان مجاز</p>
         </div>
     </div>
 
@@ -30,23 +45,23 @@
         <!-- نوار ناوبری پایین -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-tab="chat">
-                <span class="icon">💬</span>
+                <span class="icon"><img src="assets/icons/chat.png" alt="چت"></span>
                 <span>چت</span>
             </button>
             <button class="nav-item" data-tab="map">
-                <span class="icon">🗺️</span>
+                <span class="icon"><img src="assets/icons/map.png" alt="نقشه"></span>
                 <span>نقشه</span>
             </button>
             <button class="nav-item" data-tab="games">
-                <span class="icon">🎲</span>
+                <span class="icon"><img src="assets/icons/game.png" alt="بازی"></span>
                 <span>بازی</span>
             </button>
             <button class="nav-item" data-tab="expenses">
-                <span class="icon">💰</span>
+                <span class="icon"><img src="assets/icons/money.png" alt="حساب"></span>
                 <span>حساب کتاب</span>
             </button>
             <button class="nav-item" data-tab="memories">
-                <span class="icon">📸</span>
+                <span class="icon"><img src="assets/icons/gallery.png" alt="خاطرات"></span>
                 <span>خاطرات</span>
             </button>
         </nav>
@@ -62,69 +77,92 @@
                     </div>
                     <div id="chat-messages" class="messages"></div>
                     <form id="chat-form" class="chat-input">
-                        <input type="text" id="message-input" placeholder="پیامت رو بنویس...">
-                        <button type="submit">📨 ارسال</button>
-                    </form>
+                        <input type="text" id="message-input" placeholder="پیامت رو بنویس..." autocomplete="off">
+                        <button type="submit">
+                            <img src="assets/icons/send.png" alt="ارسال"
+                                style="width:20px; height:20px; object-fit:contain;">
+                        </button>
                 </div>
             </div>
 
-            <!-- تب نقشه -->
             <div id="tab-map" class="tab-pane">
+                <h2 style="padding: 0 20px;">🗺️ نقشه دوستان</h2>
                 <div id="map-container"></div>
                 <div class="map-controls">
-                    <button id="share-location-btn">📍 موقعیت منو به اشتراک بذار</button>
-                    <button id="add-pin-btn">📌 پین جدید</button>
+                    <button id="share-location-btn" class="map-btn primary-btn">
+                        📍 اشتراک موقعیت
+                    </button>
+                    <button id="add-pin-btn" class="map-btn">
+                        📌 پین جدید
+                    </button>
                 </div>
             </div>
 
-            <!-- تب بازی -->
             <div id="tab-games" class="tab-pane">
+                <h2 style="margin-bottom:20px;">🎲 بازی‌های گروهی</h2>
                 <div class="games-grid">
-                    <div class="game-card" data-game="mafia">
-                        <span>🕵️</span>
-                        <h3>مافیا</h3>
-                        <p>بازی گروهی مافیا با چت صوتی</p>
-                    </div>
-                    <div class="game-card" data-game="wordguess">
-                        <span>🎨</span>
-                        <h3>حدس کلمه</h3>
-                        <p>نقاشی بکش، کلمه رو حدس بزن</p>
-                    </div>
-                    <div class="game-card" data-game="rps">
-                        <span>✊✋✌️</span>
-                        <h3>سنگ کاغذ قیچی</h3>
-                        <p>مسابقه آنلاین با دوستان</p>
+                    <div class="game-card" data-game="bottle">
+                        <span>🍾</span>
+                        <h3>چرخوندن بطری</h3>
+                        <p>بچرخون ببین کی انتخاب میشه!</p>
                     </div>
                 </div>
             </div>
 
-            <!-- تب حساب کتاب -->
             <div id="tab-expenses" class="tab-pane">
                 <div class="expenses-container">
-                    <form id="expense-form">
-                        <input type="text" id="expense-desc" placeholder="بابت چی؟" required>
-                        <input type="number" id="expense-amount" placeholder="مبلغ (تومان)" required>
-                        <select id="expense-paid-by">
-                            <option value="">کی پرداخت کرد؟</option>
-                        </select>
-                        <button type="submit">➕ اضافه کن</button>
+                    <h2 style="margin-bottom:20px;">💰 حساب کتاب گروهی</h2>
+
+                    <form id="expense-form" class="expense-form-glass">
+                        <div class="form-row">
+                            <div class="form-group full-width">
+                                <label class="form-label">📝 بابت چی؟</label>
+                                <input type="text" id="expense-desc" placeholder="مثلاً: پیتزای امشب">
+                            </div>
+                        </div>
+                        <div class="form-row two-cols">
+                            <div class="form-group">
+                                <label class="form-label">💵 مبلغ (تومان)</label>
+                                <input type="number" id="expense-amount" placeholder="مثلاً ۲۵۰۰۰۰">
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">👤 کی پرداخت کرد؟</label>
+                                <select id="expense-paid-by">
+                                    <option value="">انتخاب کن...</option>
+                                </select>
+                            </div>
+                        </div>
+                        <button type="submit" class="submit-expense-btn">
+                            ➕ ثبت هزینه
+                        </button>
                     </form>
+
+                    <div id="balance-summary" class="balance-summary"></div>
+
+                    <h3 style="margin:20px 0 12px;">📋 لیست هزینه‌ها</h3>
                     <div id="expenses-list"></div>
-                    <div id="balance-summary"></div>
+                    <div id="settlements-list"></div>
                 </div>
             </div>
 
             <!-- تب خاطرات -->
             <div id="tab-memories" class="tab-pane">
-                <div class="memories-header">
-                    <h2>📸 گالری خاطرات</h2>
-                    <input type="file" id="memory-upload" accept="image/*" multiple>
+                <div class="memories-container">
+                    <div class="memories-header">
+                        <h2>📸 گالری خاطرات</h2>
+                        <button id="upload-memory-btn" class="upload-btn">
+                            📸 آپلود عکس
+                        </button>
+                        <input type="file" id="memory-upload" accept="image/*" multiple hidden>
+                    </div>
+                    <div id="memories-grid" class="memories-grid"></div>
                 </div>
-                <div id="memories-grid" class="masonry-grid"></div>
             </div>
-        </div>
-    </div>
 
-    <script type="module" src="js/app.js"></script>
+            <!-- Scripts -->
+            <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+            <script type="module" src="js/app.js"></script>
 </body>
+
 </html>
