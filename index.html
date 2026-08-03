@@ -7,14 +7,19 @@
     <title>Yey</title>
 
     <!-- Favicon -->
-    <link rel="icon"
-        href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍕</text></svg>">
-
+    <link rel="icon" type="image/png" href="assets/logomain.png">
     <!-- Styles -->
     <link rel="stylesheet" href="css/style.css">
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- PWA -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#0a0a0f">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Yey">
+    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
 </head>
 
 <body>
@@ -174,11 +179,55 @@
                 </div>
             </div>
 
+            <button id="install-btn"
+                style="display:none;position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:999;padding:12px 24px;background:#d4a017;color:#fff;border:none;border-radius:25px;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(0,0,0,0.3);">
+                📲 نصب اپلیکیشن
+            </button>
 
             <!-- Scripts -->
             <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
             <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
             <script type="module" src="js/app.js"></script>
+            <script>
+                // ثبت Service Worker
+                if ('serviceWorker' in navigator) {
+                    window.addEventListener('load', () => {
+                        navigator.serviceWorker.register('/sw.js').then(reg => {
+                            console.log('SW registered:', reg.scope)
+                        }).catch(err => {
+                            console.log('SW failed:', err)
+                        })
+                    })
+                }
+
+                // دکمه نصب
+                let deferredPrompt
+                window.addEventListener('beforeinstallprompt', (e) => {
+                    e.preventDefault()
+                    deferredPrompt = e
+
+                    // نشون دادن دکمه نصب
+                    const installBtn = document.getElementById('install-btn')
+                    if (installBtn) {
+                        installBtn.style.display = 'block'
+                        installBtn.addEventListener('click', () => {
+                            deferredPrompt.prompt()
+                            deferredPrompt.userChoice.then(result => {
+                                if (result.outcome === 'accepted') {
+                                    console.log('نصب شد ✅')
+                                }
+                                deferredPrompt = null
+                                installBtn.style.display = 'none'
+                            })
+                        })
+                    }
+                })
+
+                window.addEventListener('appinstalled', () => {
+                    console.log('PWA installed!')
+                    deferredPrompt = null
+                })
+            </script>
 </body>
 
 </html>
