@@ -2596,3 +2596,39 @@ body {
     0%, 100% { box-shadow: 0 0 0 0 rgba(212, 160, 23, 0.4); }
     50% { box-shadow: 0 0 0 8px rgba(212, 160, 23, 0); }
 }
+/* =========== چت موبایل =========== */
+@media (max-width: 768px) {
+    .chat-input-fixed {
+        position: fixed;
+        bottom: 75px;
+        left: 0;
+        right: 0;
+        background: var(--bg-primary);
+        padding: 8px 12px 12px;
+        border-top: 1px solid var(--border);
+        z-index: 50;
+    }
+    
+    .chat-messages-wrapper {
+        padding-bottom: 70px;
+    }
+    
+    .chat-header {
+        position: sticky;
+        top: 0;
+        z-index: 50;
+        background: var(--bg-primary);
+        padding: 10px 16px;
+    }
+    
+    .chat-selector {
+        position: sticky;
+        top: 48px;
+        z-index: 49;
+        background: var(--bg-primary);
+    }
+    
+    #install-btn {
+        display: block !important;
+    }
+}

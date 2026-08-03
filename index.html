@@ -80,12 +80,12 @@
                         <h2>گفتگوی گروهی</h2>
                         <div style="display:flex;gap:8px;align-items:center;">
                             <button id="install-btn"
-                                style="display:none;padding:8px 14px;background:#d4a017;color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;">
-                                📲 نصب
-                            </button>
+                                style="display:none;padding:8px 12px;background:#d4a017;color:#fff;border:none;border-radius:10px;font-size:12px;cursor:pointer;font-family:inherit;">📲
+                                نصب</button>
                             <button id="logout-btn" class="logout-btn">🚪 خروج</button>
                         </div>
                     </div>
+
                     <div class="chat-messages-wrapper" id="chat-messages-wrapper">
                         <div id="chat-messages" class="messages"></div>
                         <button class="scroll-to-bottom" id="scroll-to-bottom"
@@ -209,25 +209,26 @@
                     deferredPrompt = e
 
                     // نشون دادن دکمه نصب
-                    const installBtn = document.getElementById('install-btn')
-                    if (installBtn) {
-                        installBtn.style.display = 'block'
-                        installBtn.addEventListener('click', () => {
+                    const btn = document.getElementById('install-btn')
+                    if (btn) {
+                        btn.style.display = 'block'
+                        btn.addEventListener('click', () => {
                             deferredPrompt.prompt()
                             deferredPrompt.userChoice.then(result => {
                                 if (result.outcome === 'accepted') {
                                     console.log('نصب شد ✅')
+                                    btn.style.display = 'none'
                                 }
                                 deferredPrompt = null
-                                installBtn.style.display = 'none'
                             })
                         })
                     }
                 })
 
                 window.addEventListener('appinstalled', () => {
-                    console.log('PWA installed!')
-                    deferredPrompt = null
+                    console.log('نصب کامل شد!')
+                    const btn = document.getElementById('install-btn')
+                    if (btn) btn.style.display = 'none'
                 })
             </script>
 </body>
