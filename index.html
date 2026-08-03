@@ -78,9 +78,14 @@
                 <div class="chat-container">
                     <div class="chat-header">
                         <h2>گفتگوی گروهی</h2>
-                        <button id="logout-btn" class="logout-btn">🚪 خروج</button>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <button id="install-btn"
+                                style="display:none;padding:8px 14px;background:#d4a017;color:#fff;border:none;border-radius:12px;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;">
+                                📲 نصب
+                            </button>
+                            <button id="logout-btn" class="logout-btn">🚪 خروج</button>
+                        </div>
                     </div>
-
                     <div class="chat-messages-wrapper" id="chat-messages-wrapper">
                         <div id="chat-messages" class="messages"></div>
                         <button class="scroll-to-bottom" id="scroll-to-bottom"
@@ -179,10 +184,7 @@
                 </div>
             </div>
 
-            <button id="install-btn"
-                style="display:none;position:fixed;bottom:100px;left:50%;transform:translateX(-50%);z-index:999;padding:12px 24px;background:#d4a017;color:#fff;border:none;border-radius:25px;font-size:14px;cursor:pointer;font-family:inherit;box-shadow:0 4px 16px rgba(0,0,0,0.3);">
-                📲 نصب اپلیکیشن
-            </button>
+
 
             <!-- Scripts -->
             <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
