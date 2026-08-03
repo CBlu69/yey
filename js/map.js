@@ -1,4 +1,4 @@
-// js/map.js - کامل با اشتراک موقعیت زنده و لغو
+// js/map.js - نسخه نهایی کامل با مسیریابی
 import { supabase } from './supabase.js'
 import { getCurrentUser } from './auth.js'
 
@@ -10,28 +10,71 @@ export function initMap(user) {
     let sharingActive = false
     let sharingMarker = null
     let sharingTimer = null
-    let sharingUpdateInterval = null
+    let sharingWatchId = null
     let sharingStartTime = null
-    let sharingLocationId = null
+
+    // ============ مسیریابی ============
+    window.navigateTo = (lat, lng, name) => {
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+        const geoUri = `geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(name || 'مقصد')})`
+        const googleMaps = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+
+        if (isMobile && navigator.share) {
+            navigator.share({
+                title: `مسیریابی به ${name || 'مقصد'}`,
+                text: `مسیریابی به ${name || 'مقصد'}`,
+                url: googleMaps
+            }).catch(() => {
+                window.open(googleMaps, '_blank')
+            })
+        } else if (isMobile) {
+            window.location.href = geoUri
+            setTimeout(() => {
+                if (document.hasFocus()) window.open(googleMaps, '_blank')
+            }, 1000)
+        } else {
+            window.open(googleMaps, '_blank')
+        }
+    }
 
     // ============ ساخت نقشه ============
     function createMap() {
         const mapContainer = document.getElementById('map-container')
-        if (!mapContainer) return
+        if (!mapContainer) {
+            setTimeout(createMap, 300)
+            return
+        }
 
-        map = L.map('map-container').setView([35.7483, 51.8237], 14)
+        if (map) {
+            map.invalidateSize()
+            return
+        }
+
+        map = L.map('map-container', {
+            zoomControl: true,
+            fadeAnimation: true,
+            markerZoomAnimation: true
+        }).setView([35.7483, 51.8237], 14)
+
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            attribution: '© OpenStreetMap'
+            attribution: '© OpenStreetMap',
+            maxZoom: 18,
+            tileSize: 256,
+            zoomOffset: 0
         }).addTo(map)
 
         loadPins()
         startLocationTracking()
         updateShareButton()
         addMyLocationButton()
+        checkActiveSharing()
 
-        setTimeout(() => {
-            map.invalidateSize()
-        }, 100)
+        setTimeout(() => map.invalidateSize(), 200)
+
+        const observer = new MutationObserver(() => {
+            if (mapContainer.offsetParent !== null) map.invalidateSize()
+        })
+        observer.observe(mapContainer, { attributes: true, attributeFilter: ['class'] })
     }
 
     // ============ موقعیت‌یابی ============
@@ -48,7 +91,7 @@ export function initMap(user) {
                     lng: position.coords.longitude
                 }
                 updateUserMarker()
-                if (sharingActive) updateSharingMarker()
+                if (sharingActive && sharingMarker) sharingMarker.setLatLng(userLocation)
             },
             () => setDefaultLocation(),
             { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -85,32 +128,60 @@ export function initMap(user) {
 
     async function startSharing() {
         if (!userLocation) {
-            window.showToast('موقعیت هنوز مشخص نشده', 'warning')
-            return
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: true, timeout: 10000
+                    })
+                })
+                userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+                updateUserMarker()
+            } catch (err) {
+                window.showToast('موقعیت در دسترس نیست', 'error')
+                return
+            }
         }
+
         const currentUser = getCurrentUser()
-        const { data, error } = await supabase
-            .from('shared_locations')
-            .insert([{
-                user_id: currentUser?.id,
-                user_name: currentUser?.name,
-                user_avatar: currentUser?.avatar || '👤',
-                latitude: userLocation.lat,
-                longitude: userLocation.lng,
-                is_active: true
-            }]).select()
+        if (!currentUser) return
 
-        if (error) {
-            window.showToast('خطا در اشتراک موقعیت', 'error')
-            return
-        }
+        await supabase.from('active_sharings').upsert({
+            user_id: String(currentUser.id),
+            user_name: currentUser.name,
+            user_avatar: currentUser.avatar || '👤',
+            is_active: true,
+            latitude: userLocation.lat,
+            longitude: userLocation.lng,
+            started_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'user_id' })
 
-        const locationId = data?.[0]?.id
         sharingActive = true
         sharingStartTime = Date.now()
-        sharingLocationId = locationId
+
+        if (navigator.geolocation) {
+            sharingWatchId = navigator.geolocation.watchPosition(
+                async (position) => {
+                    userLocation = { lat: position.coords.latitude, lng: position.coords.longitude }
+                    updateUserMarker()
+                    if (sharingActive) {
+                        await supabase.from('active_sharings').update({
+                            latitude: userLocation.lat,
+                            longitude: userLocation.lng,
+                            updated_at: new Date().toISOString()
+                        }).eq('user_id', String(currentUser.id))
+                    }
+                    if (sharingMarker) sharingMarker.setLatLng(userLocation)
+                },
+                () => {},
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+            )
+        }
 
         if (!sharingMarker) {
+            const av = currentUser.avatar || '👤'
+            const avImg = (av.includes('/') || av.includes('.')) ? `<img src="${av}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">` : av
+
             sharingMarker = L.marker(userLocation, {
                 icon: L.divIcon({
                     html: `<div style="width:20px;height:20px;background:#2ed573;border:3px solid #fff;border-radius:50%;box-shadow:0 0 15px rgba(46,213,115,0.8);animation:pulse 1.5s infinite;"></div>`,
@@ -119,7 +190,7 @@ export function initMap(user) {
                 })
             }).addTo(map).bindPopup(`
                 <div style="text-align:center;">
-                    <b>${currentUser?.avatar || ''} ${currentUser?.name || 'من'}</b><br>
+                    <b>${avImg} ${currentUser.name || 'من'}</b><br>
                     <span style="color:#2ed573;">🟢 در حال اشتراک موقعیت</span><br>
                     <small id="sharing-timer-display">۰:۰۰</small>
                 </div>`)
@@ -129,35 +200,30 @@ export function initMap(user) {
         updateSharingTimer()
         sharingTimer = setInterval(updateSharingTimer, 1000)
         sharingMarker.on('popupopen', updateSharingTimer)
-        window.showToast('📍 موقعیتت داره به اشتراک گذاشته میشه', 'success', 2000)
-
-        sharingUpdateInterval = setInterval(async () => {
-            if (sharingActive && userLocation && sharingLocationId) {
-                await supabase.from('shared_locations')
-                    .update({ latitude: userLocation.lat, longitude: userLocation.lng })
-                    .eq('id', sharingLocationId)
-            }
-        }, 5000)
+        window.showToast('📍 اشتراک موقعیت شروع شد', 'success')
     }
 
     async function stopSharing() {
+        const currentUser = getCurrentUser()
         sharingActive = false
-        if (sharingLocationId) {
-            await supabase.from('shared_locations')
-                .update({ is_active: false, stopped_at: new Date().toISOString() })
-                .eq('id', sharingLocationId)
-            sharingLocationId = null
+
+        if (currentUser) {
+            await supabase.from('active_sharings').update({
+                is_active: false,
+                updated_at: new Date().toISOString()
+            }).eq('user_id', String(currentUser.id))
         }
+
+        if (sharingWatchId && navigator.geolocation) {
+            navigator.geolocation.clearWatch(sharingWatchId)
+            sharingWatchId = null
+        }
+
         if (sharingMarker) { map.removeLayer(sharingMarker); sharingMarker = null }
         if (sharingTimer) { clearInterval(sharingTimer); sharingTimer = null }
-        if (sharingUpdateInterval) { clearInterval(sharingUpdateInterval); sharingUpdateInterval = null }
         sharingStartTime = null
         updateShareButton()
-        window.showToast('اشتراک موقعیت متوقف شد', 'info', 2000)
-    }
-
-    function updateSharingMarker() {
-        if (sharingMarker && userLocation) sharingMarker.setLatLng(userLocation)
+        window.showToast('اشتراک موقعیت متوقف شد', 'info')
     }
 
     function updateSharingTimer() {
@@ -167,13 +233,20 @@ export function initMap(user) {
         const seconds = elapsed % 60
         const timerDisplay = document.getElementById('sharing-timer-display')
         if (timerDisplay) timerDisplay.textContent = `⏱ ${minutes}:${seconds.toString().padStart(2, '0')}`
+
         const currentUser = getCurrentUser()
+        const av = currentUser?.avatar || '👤'
+        const avImg = (av.includes('/') || av.includes('.')) ? `<img src="${av}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">` : av
+        const lat = userLocation?.lat || 0
+        const lng = userLocation?.lng || 0
+
         sharingMarker.setPopupContent(`
             <div style="text-align:center;">
-                <b>${currentUser?.avatar || ''} ${currentUser?.name || 'من'}</b><br>
+                <b>${avImg} ${currentUser?.name || 'من'}</b><br>
                 <span style="color:#2ed573;">🟢 در حال اشتراک موقعیت</span><br>
                 <small>⏱ ${minutes}:${seconds.toString().padStart(2, '0')}</small><br>
-                <button onclick="window.stopMapSharing()" style="margin-top:8px;padding:6px 14px;background:#ff4757;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit;">⏹ توقف اشتراک</button>
+                <button onclick="window.navigateTo(${lat}, ${lng}, '${currentUser?.name || 'مقصد'}')" style="margin-top:6px;padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:20px;cursor:pointer;font-size:13px;font-family:inherit;">🧭 مسیریابی</button><br>
+                <button onclick="window.stopMapSharing()" style="margin-top:6px;padding:6px 14px;background:#ff4757;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit;">⏹ توقف اشتراک</button>
             </div>`)
     }
 
@@ -188,9 +261,73 @@ export function initMap(user) {
         }
     }
 
-    window.stopMapSharing = () => { stopSharing(); map.closePopup() }
+    window.stopMapSharing = () => { stopSharing(); map?.closePopup() }
 
-    // ============ اضافه کردن پین ============
+    // ============ چک کردن اشتراک فعال قبلی ============
+    async function checkActiveSharing() {
+        const currentUser = getCurrentUser()
+        if (!currentUser) return
+
+        const { data } = await supabase.from('active_sharings')
+            .select('*')
+            .eq('user_id', String(currentUser.id))
+            .eq('is_active', true)
+            .single()
+
+        if (data) {
+            sharingActive = true
+            sharingStartTime = new Date(data.started_at).getTime()
+
+            if (data.latitude && data.longitude) {
+                userLocation = { lat: data.latitude, lng: data.longitude }
+                updateUserMarker()
+            }
+
+            if (navigator.geolocation) {
+                sharingWatchId = navigator.geolocation.watchPosition(
+                    async (position) => {
+                        userLocation = { lat: position.coords.latitude, lng: position.coords.longitude }
+                        updateUserMarker()
+                        if (sharingActive) {
+                            await supabase.from('active_sharings').update({
+                                latitude: userLocation.lat,
+                                longitude: userLocation.lng,
+                                updated_at: new Date().toISOString()
+                            }).eq('user_id', String(currentUser.id))
+                        }
+                        if (sharingMarker) sharingMarker.setLatLng(userLocation)
+                    },
+                    () => {},
+                    { enableHighAccuracy: true }
+                )
+            }
+
+            if (!sharingMarker && userLocation) {
+                const av = currentUser.avatar || '👤'
+                const avImg = (av.includes('/') || av.includes('.')) ? `<img src="${av}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">` : av
+
+                sharingMarker = L.marker(userLocation, {
+                    icon: L.divIcon({
+                        html: `<div style="width:20px;height:20px;background:#2ed573;border:3px solid #fff;border-radius:50%;box-shadow:0 0 15px rgba(46,213,115,0.8);animation:pulse 1.5s infinite;"></div>`,
+                        className: 'sharing-marker',
+                        iconSize: [20, 20]
+                    })
+                }).addTo(map).bindPopup(`
+                    <div style="text-align:center;">
+                        <b>${avImg} ${currentUser.name || 'من'}</b><br>
+                        <span style="color:#2ed573;">🟢 در حال اشتراک موقعیت</span><br>
+                        <small id="sharing-timer-display">۰:۰۰</small>
+                    </div>`)
+            }
+
+            updateShareButton()
+            updateSharingTimer()
+            sharingTimer = setInterval(updateSharingTimer, 1000)
+            window.showToast('📍 اشتراک موقعیت از قبل فعال بود', 'info')
+        }
+    }
+
+    // ============ پین‌ها ============
     document.getElementById('add-pin-btn')?.addEventListener('click', async () => {
         if (!map) return
         const pinName = await window.showPrompt('📍 نام این مکان چیه؟', '')
@@ -224,11 +361,17 @@ export function initMap(user) {
         let popupContent = `<div style="text-align:center;min-width:150px;">
             <b>📌 ${pin.name}</b><br>
             <small style="color:#9d9dab;">توسط ${pin.user_name || 'ناشناس'}</small><br>
-            <small style="color:#9d9dab;">${new Date(pin.created_at).toLocaleDateString('fa-IR')}</small>`
+            <small style="color:#9d9dab;">${new Date(pin.created_at).toLocaleDateString('fa-IR')}</small>
+            <br>
+            <button onclick="window.navigateTo(${pin.latitude}, ${pin.longitude}, '${pin.name.replace(/'/g, "\\'")}')" style="margin-top:8px;padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:20px;cursor:pointer;font-size:13px;font-family:inherit;">
+                🧭 مسیریابی
+            </button>`
+
         if (isOwner) {
-            popupContent += `<button onclick="window.deletePin(${pin.id})" style="margin-top:8px;padding:6px 14px;background:#ff4757;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit;">🗑️ حذف پین</button>`
+            popupContent += `<button onclick="window.deletePin(${pin.id})" style="margin-top:6px;padding:6px 14px;background:#ff4757;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit;">🗑️ حذف پین</button>`
         }
         popupContent += `</div>`
+
         marker.bindPopup(popupContent)
         allPins.push({ id: pin.id, marker })
     }
@@ -263,7 +406,6 @@ export function initMap(user) {
                     e.preventDefault(); e.stopPropagation()
                     if (userLocation) {
                         map.setView([userLocation.lat, userLocation.lng], 16, { animate: true, duration: 1 })
-                        window.showToast?.('📍 موقعیت فعلی شما', 'info', 1500)
                     } else {
                         navigator.geolocation.getCurrentPosition(
                             (position) => {
@@ -271,7 +413,7 @@ export function initMap(user) {
                                 updateUserMarker()
                                 map.setView([userLocation.lat, userLocation.lng], 16, { animate: true, duration: 1 })
                             },
-                            () => window.showToast?.('موقعیت در دسترس نیست 🫤', 'warning', 2000),
+                            () => window.showToast?.('موقعیت در دسترس نیست', 'warning'),
                             { enableHighAccuracy: true, timeout: 10000 }
                         )
                     }
@@ -282,9 +424,8 @@ export function initMap(user) {
         map.addControl(new MyLocationControl())
     }
 
-    // ============ گوش دادن به تغییرات پین‌ها ============
-    supabase
-        .channel('pins')
+    // ============ Real-time ============
+    supabase.channel('pins')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'pins' }, (payload) => {
             if (!allPins.find(p => p.id === payload.new.id)) addPinToMap(payload.new)
         })
@@ -295,7 +436,6 @@ export function initMap(user) {
         })
         .subscribe()
 
-    // 👇 این دو خط آخر - حتماً داخل initMap باشه
     window.getMap = () => map
     setTimeout(createMap, 500)
 }

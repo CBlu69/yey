@@ -75,13 +75,24 @@
                         <h2>گفتگوی گروهی</h2>
                         <button id="logout-btn" class="logout-btn">🚪 خروج</button>
                     </div>
-                    <div id="chat-messages" class="messages"></div>
-                    <form id="chat-form" class="chat-input">
-                        <input type="text" id="message-input" placeholder="پیامت رو بنویس..." autocomplete="off">
-                        <button type="submit">
-                            <img src="assets/icons/send.png" alt="ارسال"
-                                style="width:20px; height:20px; object-fit:contain;">
+
+                    <div class="chat-messages-wrapper" id="chat-messages-wrapper">
+                        <div id="chat-messages" class="messages"></div>
+                        <button class="scroll-to-bottom" id="scroll-to-bottom"
+                            onclick="document.getElementById('chat-messages-wrapper').scrollTo({top: document.getElementById('chat-messages-wrapper').scrollHeight, behavior: 'smooth'})">
+                            ⬇
                         </button>
+                    </div>
+
+                    <div class="chat-input-fixed">
+                        <form id="chat-form" class="chat-input">
+                            <input type="text" id="message-input" placeholder="پیامت رو بنویس..." autocomplete="off">
+                            <button type="submit">
+                                <img src="assets/icons/send.png" alt="ارسال"
+                                    style="width:20px; height:20px; object-fit:contain;">
+                            </button>
+                        </form>
+                    </div>
                 </div>
             </div>
 
@@ -114,27 +125,31 @@
                     <h2 style="margin-bottom:20px;">💰 حساب کتاب گروهی</h2>
 
                     <form id="expense-form" class="expense-form-glass">
-                        <div class="form-row">
-                            <div class="form-group full-width">
-                                <label class="form-label">📝 بابت چی؟</label>
-                                <input type="text" id="expense-desc" placeholder="مثلاً: پیتزای امشب">
-                            </div>
+                        <!-- بابت چی -->
+                        <div class="form-group full-width">
+                            <label class="form-label">📝 بابت چی؟</label>
+                            <input type="text" id="expense-desc" placeholder="مثلاً: پیتزای امشب">
                         </div>
-                        <div class="form-row two-cols">
-                            <div class="form-group">
-                                <label class="form-label">💵 مبلغ (تومان)</label>
-                                <input type="number" id="expense-amount" placeholder="مثلاً ۲۵۰۰۰۰">
-                            </div>
-                            <div class="form-group">
-                                <label class="form-label">👤 کی پرداخت کرد؟</label>
-                                <select id="expense-paid-by">
-                                    <option value="">انتخاب کن...</option>
-                                </select>
-                            </div>
+
+                        <!-- مبلغ -->
+                        <div class="form-group full-width">
+                            <label class="form-label">💵 مبلغ (تومان)</label>
+                            <input type="number" id="expense-amount" placeholder="مثلاً ۲۵۰۰۰۰">
                         </div>
-                        <button type="submit" class="submit-expense-btn">
-                            ➕ ثبت هزینه
-                        </button>
+
+                        <!-- کی پرداخت کرد -->
+                        <div class="form-group full-width">
+                            <label class="form-label">👤 کی پرداخت کرد؟</label>
+                            <select id="expense-paid-by">
+                                <option value="">👤 کی پرداخت کرد؟</option>
+                            </select>
+                        </div>
+
+                        <!-- کی‌ها بودن -->
+                        <div class="form-group full-width" id="participants-container"></div>
+
+                        <!-- دکمه ثبت -->
+                        <button type="submit" class="submit-expense-btn">➕ ثبت هزینه</button>
                     </form>
 
                     <div id="balance-summary" class="balance-summary"></div>
@@ -158,6 +173,7 @@
                     <div id="memories-grid" class="memories-grid"></div>
                 </div>
             </div>
+
 
             <!-- Scripts -->
             <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

@@ -1,5 +1,4 @@
-// js/config.js
-const ALLOWED_USERS = ['مهدی', 'صادق', 'دنیز']
+const ALLOWED_USERS = ['مهدی', 'صادق', 'آرزو', 'دنیز']
 const ADMIN_NAME = 'مهدی'
 
 const USERS_DATABASE = {
@@ -17,8 +16,15 @@ const USERS_DATABASE = {
         role: 'member',
         color: '#c90c0c'
     },
-    'دنیز': {
+    'آرزو': {
         id: 'user_003',
+        name: 'آرزو',
+        avatar: 'assets/avatars/arezo.png',
+        role: 'member',
+        color: '#0051ff'
+    },
+    'دنیز': {
+        id: 'user_004',
         name: 'دنیز',
         avatar: 'assets/avatars/deniz.png',
         role: 'member',

@@ -208,12 +208,20 @@ function handleTabs() {
             const targetPane = document.getElementById(`tab-${tabName}`)
             if (targetPane) {
                 targetPane.classList.add('active')
-
-                // 👇 اینو اضافه کن - رفع مشکل نقشه توی تب مخفی
                 if (tabName === 'map') {
                     setTimeout(() => {
                         const m = window.getMap?.()
-                        if (m) m.invalidateSize()
+                        if (m) {
+                            m.invalidateSize()
+                        }
+                    }, 400)
+                }
+                // وقتی تب expenses باز میشه
+                if (tabName === 'expenses') {
+                    setTimeout(() => {
+                        if (window.initExpensesTab) {
+                            window.initExpensesTab(currentUser)
+                        }
                     }, 200)
                 }
             }
@@ -228,13 +236,16 @@ function initAllModules(user) {
         initChat(user)
         initMap(user)
         initGames(user)
-        initExpenses(user)
         initMemories(user)
+
+        // expenses رو با تاخیر صدا بزن
+        setTimeout(() => {
+            initExpenses(user)
+        }, 300)
     } catch (error) {
-        console.error('Error initializing modules:', error)
+        console.error('Error:', error)
     }
 }
-
 // ==================== خروج ====================
 const logoutBtn = document.getElementById('logout-btn')
 if (logoutBtn) {

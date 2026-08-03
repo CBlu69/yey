@@ -305,20 +305,16 @@ body {
 /* =========== TAB CONTENT =========== */
 .tab-content {
     flex: 1;
-    overflow: hidden;
+    overflow-y: auto;
     padding-bottom: 90px;
 }
 
 .tab-pane {
     display: none;
-    height: 100%;
-    overflow-y: auto;
-    padding: 20px;
 }
 
 .tab-pane.active {
     display: block;
-    animation: fadeIn 0.3s ease;
 }
 
 /* =========== CHAT =========== */
@@ -560,7 +556,7 @@ body {
 }
 
 #expense-form button:hover {
-    background: #7c6ff7;
+    background: #f0c75e;
 }
 
 .expense-item {
@@ -1048,7 +1044,7 @@ body {
 }
 
 .map-btn.primary-btn:hover {
-    background: #7c6ff7;
+    background: #f0c75e;
     box-shadow: 0 4px 16px rgba(108, 92, 231, 0.4);
 }
 
@@ -2070,4 +2066,568 @@ body {
     display: block;
     aspect-ratio: 1 / 1;
     /* اینو اضافه کن */
+}
+
+/* =========== انتخابگر چت =========== */
+.chat-selector {
+    margin-bottom: 12px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+}
+
+.chat-tabs {
+    display: flex;
+    gap: 6px;
+    flex-wrap: nowrap;
+    padding-bottom: 4px;
+}
+
+.chat-tab {
+    padding: 8px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: var(--transition);
+    font-family: inherit;
+}
+
+.chat-tab.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.chat-tab:hover:not(.active) {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.chat-tab.admin-tab {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    padding: 6px 10px;
+}
+
+.chat-tab.admin-tab img {
+    width: 18px;
+    height: 18px;
+    object-fit: contain;
+}
+
+.chat-tab.admin-tab:hover {
+    background: #c4c4c4;
+}
+
+.chat-tab.admin-tab:hover {
+    background: #c4c4c4;
+}
+
+.prompt-input {
+    width: 100%;
+    padding: 12px 16px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-family: 'Inter', 'Vazirmatn', sans-serif;
+    outline: none;
+    text-align: center;
+    transition: all 0.2s;
+    box-sizing: border-box;
+}
+
+.prompt-input:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px rgba(108, 92, 231, 0.2);
+}
+
+.chat-tab-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.delete-group-btn {
+    position: absolute;
+    top: -6px;
+    right: -6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: none;
+    background: #ff4757;
+    color: #fff;
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 2;
+}
+
+.chat-tab-wrapper:hover .delete-group-btn {
+    opacity: 1;
+}
+
+.delete-group-btn:hover {
+    background: #ff0000;
+    transform: scale(1.1);
+}
+
+/* =========== نشانگر پیام جدید =========== */
+.chat-tab-wrapper {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    flex-shrink: 0;
+}
+
+.chat-tab {
+    position: relative;
+}
+
+.unread-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    width: 10px;
+    height: 10px;
+    background: #3b82f6;
+    border-radius: 50%;
+    border: 2px solid var(--bg-secondary);
+    z-index: 3;
+    animation: badgePulse 2s infinite;
+}
+
+@keyframes badgePulse {
+
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.6);
+    }
+
+    50% {
+        box-shadow: 0 0 0 6px rgba(59, 130, 246, 0);
+    }
+}
+
+.unread-count {
+    position: absolute;
+    top: -6px;
+    right: -8px;
+    min-width: 16px;
+    height: 16px;
+    background: #3b82f6;
+    color: #fff;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 4px;
+    border: 2px solid var(--bg-secondary);
+    z-index: 3;
+}
+
+.delete-group-btn {
+    position: absolute;
+    top: -6px;
+    left: -6px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    border: none;
+    background: #ff4757;
+    color: #fff;
+    font-size: 11px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    opacity: 0;
+    transition: opacity 0.2s;
+    z-index: 2;
+}
+
+.chat-tab-wrapper:hover .delete-group-btn {
+    opacity: 1;
+}
+
+.delete-group-btn:hover {
+    background: #ff0000;
+    transform: scale(1.1);
+}
+
+/* =========== چت - باکس ارسال ثابت =========== */
+.chat-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    max-width: 700px;
+    margin: 0 auto;
+    width: 100%;
+    position: relative;
+}
+
+.chat-messages-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    padding-bottom: 10px;
+    position: relative;
+}
+
+.messages {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px;
+    min-height: 100%;
+}
+
+/* باکس ارسال ثابت */
+.chat-input-fixed {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-primary);
+    padding: 8px 16px 16px;
+    border-top: 1px solid var(--border);
+    z-index: 10;
+}
+
+.chat-input {
+    display: flex;
+    gap: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    padding: 6px;
+    border-radius: 16px;
+    box-shadow: var(--shadow-sm);
+}
+
+.chat-input input {
+    flex: 1;
+    height: 44px;
+    padding: 0 16px;
+    background: var(--bg-tertiary);
+    border: none;
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+    font-family: 'Inter', 'Vazirmatn', sans-serif;
+}
+
+.chat-input input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.chat-input button {
+    width: 44px;
+    height: 44px;
+    background: var(--accent);
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.chat-input button:hover {
+    background: #7c6ff7;
+}
+
+/* دکمه اسکرول به پایین */
+.scroll-to-bottom {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 40px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    z-index: 5;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+    animation: fadeInUp 0.3s ease;
+}
+
+.scroll-to-bottom.show {
+    display: flex;
+}
+
+.scroll-to-bottom:hover {
+    transform: translateX(-50%) scale(1.1);
+}
+
+@keyframes fadeInUp {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+/* =========== چت - هدر ثابت + باکس ارسال ثابت =========== */
+.chat-container {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    max-width: 700px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+/* هدر ثابت */
+.chat-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--bg-primary);
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+/* انتخابگر چت ثابت */
+.chat-selector {
+    background: var(--bg-primary);
+    padding: 0 16px 8px;
+    border-bottom: 1px solid var(--border);
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+/* wrapper پیام‌ها - بین هدر و باکس ارسال */
+.chat-messages-wrapper {
+    flex: 1;
+    overflow-y: auto;
+    position: relative;
+    background: var(--bg-primary);
+}
+
+.messages {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 16px;
+    min-height: 100%;
+}
+
+/* باکس ارسال ثابت پایین */
+.chat-input-fixed {
+    background: var(--bg-primary);
+    padding: 8px 16px 16px;
+    border-top: 1px solid var(--border);
+    z-index: 10;
+    flex-shrink: 0;
+}
+
+.chat-input {
+    display: flex;
+    gap: 8px;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    padding: 6px;
+    border-radius: 16px;
+    box-shadow: var(--shadow-sm);
+}
+
+.chat-input input {
+    flex: 1;
+    height: 44px;
+    padding: 0 16px;
+    background: var(--bg-tertiary);
+    border: none;
+    border-radius: 12px;
+    color: var(--text-primary);
+    font-size: 14px;
+    outline: none;
+    font-family: 'Inter', 'Vazirmatn', sans-serif;
+}
+
+.chat-input input::placeholder {
+    color: var(--text-tertiary);
+}
+
+.chat-input button {
+    width: 44px;
+    height: 44px;
+    background: var(--accent);
+    border: none;
+    border-radius: 12px;
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    transition: var(--transition);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.chat-input button:hover {
+    background: #7c6ff7;
+}
+
+/* دکمه اسکرول به پایین */
+.scroll-to-bottom {
+    position: absolute;
+    bottom: 80px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 40px;
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+    z-index: 5;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.scroll-to-bottom.show {
+    display: flex;
+}
+
+.scroll-to-bottom:hover {
+    transform: translateX(-50%) scale(1.1);
+}
+
+/* تب چت - ارتفاع کامل */
+#tab-chat {
+    padding: 0 !important;
+    overflow: hidden !important;
+}
+
+#tab-chat.active {
+    display: flex !important;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* =========== انتخاب شرکت‌کنندگان =========== */
+.participants-grid {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.participant-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+    user-select: none;
+}
+
+.participant-label:has(input:checked) {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+
+.participant-label input {
+    display: none;
+}
+
+.participant-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+}
+
+.participant-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.select-all-btn {
+    margin-top: 8px;
+    padding: 6px 14px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    color: var(--text-secondary);
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s;
+}
+
+.select-all-btn:hover {
+    background: var(--bg-card);
+    color: var(--text-primary);
+}
+
+.expense-participants {
+    margin-top: 4px;
+    display: flex;
+    gap: 2px;
+    flex-wrap: wrap;
+}
+.memory-view-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(108, 92, 231, 0.8);
+    color: #fff;
+    font-size: 14px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+
+.memory-view-btn:hover {
+    background: var(--accent);
+    transform: scale(1.1);
 }
