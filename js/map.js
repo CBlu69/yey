@@ -1,4 +1,4 @@
-// js/map.js - کامل با is_active
+// js/map.js - کامل بدون خطا
 import { supabase } from './supabase.js'
 import { getCurrentUser } from './auth.js'
 
@@ -47,7 +47,8 @@ export function initMap(user) {
         sharingActive = true; sharingStartTime = Date.now()
         if (navigator.geolocation) sharingWatchId = navigator.geolocation.watchPosition(async (pos) => { userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; updateUserMarker(); if (sharingActive) await supabase.from('shared_locations').update({ lat: userLocation.lat, lng: userLocation.lng, updated_at: new Date().toISOString() }).eq('user_id', String(cu.id)); if (sharingMarker) sharingMarker.setLatLng(userLocation) }, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
         if (!sharingMarker) {
-            const av = cu.avatar || '👤'; const avImg = (av.includes('/')||av.includes('.')) ? `<img src="${av}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">` : av
+            const av = cu.avatar || '👤'
+            const avImg = (av.includes('/')||av.includes('.')) ? `<img src="${av}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">` : av
             sharingMarker = L.marker(userLocation, { icon: L.divIcon({ html: '<div style="width:20px;height:20px;background:#2ed573;border:3px solid #fff;border-radius:50%;box-shadow:0 0 15px rgba(46,213,115,0.8);animation:pulse 1.5s infinite;"></div>', className: 'sharing-marker', iconSize: [20,20] }) }).addTo(map).bindPopup(`<div style="text-align:center;"><b>${avImg} ${cu.name||'من'}</b><br><span style="color:#2ed573;">🟢 در حال اشتراک</span><br><small id="sharing-timer-display">۰:۰۰</small></div>`)
         }
         updateShareButton(); updateSharingTimer(); sharingTimer = setInterval(updateSharingTimer, 1000); sharingMarker.on('popupopen', updateSharingTimer)
@@ -68,8 +69,9 @@ export function initMap(user) {
         if (!sharingStartTime || !sharingMarker) return
         const elapsed = Math.floor((Date.now() - sharingStartTime) / 1000), minutes = Math.floor(elapsed / 60), seconds = elapsed % 60
         const td = document.getElementById('sharing-timer-display'); if (td) td.textContent = `⏱ ${minutes}:${seconds.toString().padStart(2,'0')}`
-        const cu = getCurrentUser(); const av = cu?.avatar || '👤'; const avImg = (av.includes('/')||av.includes('.')) ? `<img src="${av}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">` : av
-        sharingMarker.setPopupContent(`<div style="text-align:center;"><b>${avImg} ${cu?.name||'من'}</b><br><span style="color:#2ed573;">🟢 در حال اشتراک</span><br><small>⏱ ${minutes}:${seconds.toString().padStart(2,'0')}</small><br><button onclick="window.navigateTo(${userLocation?.lat||0},${userLocation?.lng||0},'${cu?.name||'مقصد'}')" style="margin-top:6px;padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:20px;cursor:pointer;font-size:13px;font-family:inherit;">🧭 مسیریابی</button><br><button onclick="window.stopMapSharing()" style="margin-top:6px;padding:6px 14px;background:#ff4757;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit;">⏹ توقف</button></div>`)
+        const cu = getCurrentUser(); const av = cu?.avatar || '👤'
+        const avImg = (av.includes('/')||av.includes('.')) ? `<img src="${av}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">` : av
+        sharingMarker.setPopupContent(`<div style="text-align:center;"><b>${avImg} ${cu?.name||'من'}</b><br><span style="color:#2ed573;">🟢 در حال اشتراک</span><br><small>⏱ ${minutes}:${seconds.toString().padStart(2,'0')}</small><br><button onclick="window.navigateTo(${userLocation?.lat||0},${userLocation?.lng||0},'${cu?.name||''}')" style="margin-top:6px;padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:20px;cursor:pointer;font-size:13px;font-family:inherit;">🧭 مسیریابی</button><br><button onclick="window.stopMapSharing()" style="margin-top:6px;padding:6px 14px;background:#ff4757;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit;">⏹ توقف</button></div>`)
     }
 
     function updateShareButton() {
@@ -88,7 +90,8 @@ export function initMap(user) {
         if (data.lat && data.lng) { userLocation = { lat: data.lat, lng: data.lng }; updateUserMarker() }
         if (navigator.geolocation) sharingWatchId = navigator.geolocation.watchPosition(async (pos) => { userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; updateUserMarker(); if (sharingActive) await supabase.from('shared_locations').update({ lat: userLocation.lat, lng: userLocation.lng, updated_at: new Date().toISOString() }).eq('user_id', String(cu.id)); if (sharingMarker) sharingMarker.setLatLng(userLocation) }, () => {}, { enableHighAccuracy: true })
         if (!sharingMarker && userLocation) {
-            const av = cu.avatar || '👤'; const avImg = (av.includes('/')||av.includes('.')) ? `<img src="${av}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">` : av
+            const av = cu.avatar || '👤'
+            const avImg = (av.includes('/')||av.includes('.')) ? `<img src="${av}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">` : av
             sharingMarker = L.marker(userLocation, { icon: L.divIcon({ html: '<div style="width:20px;height:20px;background:#2ed573;border:3px solid #fff;border-radius:50%;box-shadow:0 0 15px rgba(46,213,115,0.8);animation:pulse 1.5s infinite;"></div>', className: 'sharing-marker', iconSize: [20,20] }) }).addTo(map).bindPopup(`<div style="text-align:center;"><b>${avImg} ${cu.name||'من'}</b><br><span style="color:#2ed573;">🟢 در حال اشتراک</span><br><small id="sharing-timer-display">۰:۰۰</small></div>`)
         }
         updateShareButton(); updateSharingTimer(); sharingTimer = setInterval(updateSharingTimer, 1000)
@@ -104,11 +107,12 @@ export function initMap(user) {
     }
 
     function addFriendMarker(share) {
-        const av = share.user_avatar || '👤'; const avImg = (av.includes('/')||av.includes('.')) ? `<img src="${av}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid #2ed573;">` : av
+        const av = share.user_avatar || '👤'
+        const avImg = (av.includes('/')||av.includes('.')) ? `<img src="${av}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;border:2px solid #2ed573;">` : av
         const elapsed = share.started_at ? Math.floor((Date.now() - new Date(share.started_at).getTime()) / 1000 / 60) : 0
         const timeText = elapsed < 60 ? `${elapsed} دقیقه` : `${Math.floor(elapsed/60)} ساعت`
         const marker = L.marker([share.lat, share.lng], { icon: L.divIcon({ html: `<div style="position:relative;width:36px;height:36px;border-radius:50%;background:rgba(46,213,115,0.3);display:flex;align-items:center;justify-content:center;animation:pulse 2s infinite;">${avImg}<div style="position:absolute;bottom:-3px;left:50%;transform:translateX(-50%);width:10px;height:10px;background:#2ed573;border-radius:50%;border:2px solid #fff;"></div></div>`, className: 'friend-marker', iconSize: [36,46], iconAnchor: [18,46] }) }).addTo(map)
-        marker.bindPopup(`<div style="text-align:center;"><b>${share.user_name||'ناشناس'}</b><br><span style="color:#2ed573;">🟢 در حال اشتراک</span><br><small>⏱ حدود ${timeText}</small><br><button onclick="window.navigateTo(${share.lat},${share.lng},'${share.user_name}')" style="margin-top:6px;padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:20px;cursor:pointer;font-size:12px;font-family:inherit;">🧭 مسیریابی</button></div>`)
+        marker.bindPopup(`<div style="text-align:center;"><b>${share.user_name||'ناشناس'}</b><br><span style="color:#2ed573;">🟢 در حال اشتراک</span><br><small>⏱ حدود ${timeText}</small><br><button onclick="window.navigateTo(${share.lat},${share.lng},'${share.user_name||''}')" style="margin-top:6px;padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:20px;cursor:pointer;font-size:12px;font-family:inherit;">🧭 مسیریابی</button></div>`)
         allPins.push({ id: `share-${share.user_id}`, marker })
     }
 
