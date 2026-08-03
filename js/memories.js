@@ -2,6 +2,8 @@
 import { supabase } from './supabase.js'
 import { getCurrentUser } from './auth.js'
 
+let realtimeSetup = false
+
 export function initMemories(user) {
     const memoriesGrid = document.getElementById('memories-grid')
     const uploadInput = document.getElementById('memory-upload')
@@ -10,6 +12,7 @@ export function initMemories(user) {
     if (!memoriesGrid) return
     
     loadMemories()
+    setupRealtime()
     
     uploadBtn?.addEventListener('click', () => uploadInput?.click())
     
@@ -92,6 +95,14 @@ export function initMemories(user) {
         
         function escHandler(e) { if (e.key === 'Escape') { overlay.remove(); document.removeEventListener('keydown', escHandler) } }
         document.addEventListener('keydown', escHandler)
+    }
+    
+    function setupRealtime() {
+        if (realtimeSetup) return
+        realtimeSetup = true
+        supabase.channel('memories-updates')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'memories' }, () => loadMemories())
+            .subscribe()
     }
     
     async function loadMemories() {

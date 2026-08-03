@@ -1,4 +1,4 @@
-// js/expenses.js - نسخه مرتب و نهایی
+// js/expenses.js - نسخه نهایی با Real-time
 import { supabase } from './supabase.js'
 import { getCurrentUser } from './auth.js'
 
@@ -10,7 +10,9 @@ const USERS_DATABASE = {
     'دنیز': { id: 'user_004', name: 'دنیز', avatar: 'assets/avatars/deniz.png', color: '#00f7ff' }
 }
 
-export function initExpenses(user) { }
+let realtimeSetup = false
+
+export function initExpenses(user) {}
 
 window.initExpensesTab = function (user) {
     const payerSelect = document.getElementById('expense-paid-by')
@@ -22,14 +24,12 @@ window.initExpensesTab = function (user) {
 
     if (!payerSelect || !listDiv || !formEl) return
 
-    // پر کردن اولیه
     fillSelectAndParticipants()
     loadAllData()
+    setupRealtime()
 
-    // ثبت هزینه
     formEl.onsubmit = async (e) => {
         e.preventDefault()
-
         const desc = document.getElementById('expense-desc').value.trim()
         const amount = document.getElementById('expense-amount').value.trim()
         const paidBy = payerSelect.value
@@ -43,29 +43,20 @@ window.initExpensesTab = function (user) {
 
         const payer = USERS_DATABASE[paidBy] || { avatar: '👤', color: '#6c5ce7' }
         const { error } = await supabase.from('expenses').insert([{
-            description: desc,
-            amount: parseInt(amount),
-            paid_by: paidBy,
-            paid_by_avatar: payer.avatar,
-            paid_by_color: payer.color,
-            participants: participants,
-            participant_count: participants.length,
-            user_id: cu?.id,
-            user_name: cu?.name,
-            created_at: new Date().toISOString()
+            description: desc, amount: parseInt(amount), paid_by: paidBy,
+            paid_by_avatar: payer.avatar, paid_by_color: payer.color,
+            participants: participants, participant_count: participants.length,
+            user_id: cu?.id, user_name: cu?.name, created_at: new Date().toISOString()
         }])
 
         if (error) return window.showToast('خطا', 'error')
-
         window.showToast('✅ ثبت شد', 'success')
         formEl.reset()
         document.querySelectorAll('.participant-check').forEach(cb => cb.checked = true)
         loadAllData()
     }
 
-    // ========== توابع ==========
     function fillSelectAndParticipants() {
-        // سلکت پرداخت‌کننده
         payerSelect.innerHTML = '<option value="">👤 کی پرداخت کرد؟</option>'
         ALLOWED_USERS.forEach(name => {
             const u = USERS_DATABASE[name]
@@ -75,28 +66,20 @@ window.initExpensesTab = function (user) {
             payerSelect.innerHTML += `<option value="${name}">${img} ${name}</option>`
         })
 
-        // چک‌باکس شرکت‌کنندگان
         if (!participantsContainer) return
         participantsContainer.innerHTML = `
             <label class="form-label" style="margin-top:12px;">👥 کی‌ها بودن؟</label>
             <div class="participants-grid">
                 ${ALLOWED_USERS.map(name => {
-            const u = USERS_DATABASE[name]
-            if (!u) return ''
-            const av = u.avatar || '👤'
-            const img = (av.includes('/') || av.includes('.')) ? `<img src="${av}">` : av
-            return `
-                        <label class="participant-label">
-                            <input type="checkbox" value="${name}" class="participant-check" checked>
-                            <span class="participant-avatar">${img}</span>
-                            <span>${name}</span>
-                        </label>
-                    `
-        }).join('')}
+                    const u = USERS_DATABASE[name]
+                    if (!u) return ''
+                    const av = u.avatar || '👤'
+                    const img = (av.includes('/') || av.includes('.')) ? `<img src="${av}">` : av
+                    return `<label class="participant-label"><input type="checkbox" value="${name}" class="participant-check" checked><span class="participant-avatar">${img}</span><span>${name}</span></label>`
+                }).join('')}
             </div>
             <button type="button" class="select-all-btn" id="select-all-btn">✅ انتخاب همه</button>
         `
-
         document.getElementById('select-all-btn').addEventListener('click', () => {
             const all = document.querySelectorAll('.participant-check:checked').length === ALLOWED_USERS.length
             document.querySelectorAll('.participant-check').forEach(cb => cb.checked = !all)
@@ -155,43 +138,26 @@ window.initExpensesTab = function (user) {
                         <div class="expense-unit">تومان</div>
                         ${!isPayer && parts.includes(cu?.name) && !settUsers.includes(cu?.name) ? `<button class="settle-btn" onclick="window.settleExp(${exp.id},'${exp.paid_by}',${pp})">💳 تسویه</button>` : isPayer ? `<span style="font-size:12px;color:${remaining === 0 ? '#2ed573' : '#ffa502'}">${remaining === 0 ? '✅' : '⏳' + remaining.toLocaleString()}</span>` : settUsers.includes(cu?.name) ? `<span style="font-size:12px;color:#2ed573;">✅</span>` : !parts.includes(cu?.name) ? `<span style="font-size:11px;color:#9d9dab;">نبودی</span>` : ''}
                     </div>
-                </div>
-            `
+                </div>`
         })
 
-        // تاریخچه تسویه
         if (settDiv) {
             const settData = settlements || []
             settDiv.innerHTML = settData.length > 0 ? '<h3 style="margin:20px 0 12px;">💳 تاریخچه تسویه‌ها</h3>' + settData.map(s => {
                 const fromAv = s.from_user_avatar || '👤'
-                const fromImg = (fromAv.includes('/') || fromAv.includes('.'))
-                    ? `<img src="${fromAv}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">`
-                    : fromAv
-
-                return `
-            <div class="settlement-row">
-                <span>${fromImg} ${s.from_user}</span>
-                <span style="color:#9d9dab;">➔</span>
-                <span>${s.to_user}</span>
-                <span class="settlement-amount">${s.amount.toLocaleString()} تومان</span>
-            </div>
-        `
+                const fromImg = (fromAv.includes('/') || fromAv.includes('.')) ? `<img src="${fromAv}" style="width:20px;height:20px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">` : fromAv
+                return `<div class="settlement-row"><span>${fromImg} ${s.from_user}</span><span style="color:#9d9dab;">➔</span><span>${s.to_user}</span><span class="settlement-amount">${s.amount.toLocaleString()} تومان</span></div>`
             }).join('') : ''
         }
 
-        // تراز حساب
         if (balanceDiv) {
             const bal = {}
             ALLOWED_USERS.forEach(n => bal[n] = 0)
-
             expenses.forEach(exp => {
                 const parts = exp.participants || ALLOWED_USERS
                 const pp = Math.floor(exp.amount / parts.length)
-                parts.forEach(name => {
-                    bal[name] = (bal[name] || 0) + (name === exp.paid_by ? exp.amount - pp : -pp)
-                })
+                parts.forEach(name => { bal[name] = (bal[name] || 0) + (name === exp.paid_by ? exp.amount - pp : -pp) })
             })
-
             const cr = [], db = [], st = []
             ALLOWED_USERS.forEach(name => {
                 const u = USERS_DATABASE[name] || { avatar: '👤', color: '#6c5ce7' }
@@ -200,28 +166,27 @@ window.initExpensesTab = function (user) {
                 else if (b < -500) db.push({ ...u, name, balance: Math.abs(b) })
                 else st.push({ ...u, name })
             })
-
             balanceDiv.innerHTML = '<h3 style="margin-bottom:16px;">📊 تراز حساب‌ها</h3>' +
-                (cr.length ? `<div class="balance-section"><div class="balance-section-title" style="color:#2ed573;">🟢 طلبکارها</div>${cr.map(c => `<div class="balance-row"><div class="balance-user"><span class="balance-avatar" style="background:${c.color};">${(c.avatar.includes('/') || c.avatar.includes('.')) ? `<img src="${c.avatar}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;">` : c.avatar}</span><span>${c.name}</span></div><div class="balance-amount positive">+${c.balance.toLocaleString()}</div></div>`).join('')}</div>` : '') +
-                (db.length ? `<div class="balance-section"><div class="balance-section-title" style="color:#ff4757;">🔴 بدهکارها</div>${db.map(d => `<div class="balance-row"><div class="balance-user"><span class="balance-avatar" style="background:${d.color};">${(d.avatar.includes('/') || d.avatar.includes('.')) ? `<img src="${d.avatar}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;">` : d.avatar}</span><span>${d.name}</span></div><div class="balance-amount negative">-${d.balance.toLocaleString()}</div></div>`).join('')}</div>` : '') +
-                (st.length ? `<div class="balance-section"><div class="balance-section-title" style="color:#9d9dab;">⚪ تسویه شده</div>${st.map(s => `<div class="balance-row"><div class="balance-user"><span class="balance-avatar" style="background:${s.color};">${(s.avatar.includes('/') || s.avatar.includes('.')) ? `<img src="${s.avatar}" style="width:34px;height:34px;border-radius:50%;object-fit:cover;">` : s.avatar}</span><span>${s.name}</span></div><div class="balance-amount neutral">✓</div></div>`).join('')}</div>` : '')
+                (cr.length ? `<div class="balance-section"><div style="color:#2ed573;">🟢 طلبکارها</div>${cr.map(c => `<div class="balance-row"><span>${(c.avatar.includes('/')||c.avatar.includes('.'))?`<img src="${c.avatar}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">`:c.avatar} ${c.name}</span><span style="color:#2ed573;">+${c.balance.toLocaleString()}</span></div>`).join('')}</div>` : '') +
+                (db.length ? `<div class="balance-section"><div style="color:#ff4757;">🔴 بدهکارها</div>${db.map(d => `<div class="balance-row"><span>${(d.avatar.includes('/')||d.avatar.includes('.'))?`<img src="${d.avatar}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">`:d.avatar} ${d.name}</span><span style="color:#ff4757;">-${d.balance.toLocaleString()}</span></div>`).join('')}</div>` : '') +
+                (st.length ? `<div class="balance-section"><div style="color:#9d9dab;">⚪ تسویه</div>${st.map(s => `<div class="balance-row"><span>${(s.avatar.includes('/')||s.avatar.includes('.'))?`<img src="${s.avatar}" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">`:s.avatar} ${s.name}</span><span>✓</span></div>`).join('')}</div>` : '')
         }
     }
 
-    // تسویه
+    function setupRealtime() {
+        if (realtimeSetup) return
+        realtimeSetup = true
+        supabase.channel('expenses-updates')
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'expenses' }, () => loadAllData())
+            .subscribe()
+    }
+
     window.settleExp = async (id, to, amount) => {
         const cu = getCurrentUser()
         if (!cu) return
         const ok = await window.showConfirm(`${amount.toLocaleString()} تومان به ${to}؟`, 'تسویه')
         if (!ok) return
-        await supabase.from('settlements').insert([{
-            expense_id: id,
-            from_user: cu.name,
-            from_user_avatar: cu.avatar || '👤',
-            to_user: to,
-            amount,
-            created_at: new Date().toISOString()
-        }])
+        await supabase.from('settlements').insert([{ expense_id: id, from_user: cu.name, from_user_avatar: cu.avatar || '👤', to_user: to, amount, created_at: new Date().toISOString() }])
         window.showToast('✅ تسویه شد', 'success')
         loadAllData()
     }
