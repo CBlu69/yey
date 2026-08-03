@@ -6,16 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Yey</title>
 
-    <!-- Favicon -->
     <link rel="icon" type="image/png" href="assets/logomain.png">
-
-    <!-- Styles -->
     <link rel="stylesheet" href="css/style.css">
-
-    <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-    <!-- PWA -->
     <link rel="manifest" href="manifest.json">
     <meta name="theme-color" content="#0a0a0f">
     <meta name="mobile-web-app-capable" content="yes">
@@ -31,7 +25,7 @@
         <div class="auth-container" id="auth-container">
             <div class="auth-logo">
                 <img src="assets/logo.png" alt="logo"
-                    style="width:100%; height:100%; object-fit:cover; border-radius:18px;">
+                    style="width:100%;height:100%;object-fit:cover;border-radius:18px;">
             </div>
             <p class="subtitle">اسمت رو وارد کن</p>
             <div class="input-wrapper">
@@ -48,60 +42,59 @@
     <div id="main-screen" class="screen">
         <nav class="bottom-nav">
             <button class="nav-item active" data-tab="chat">
-                <span class="icon"><img src="assets/icons/chat.png" alt="چت"></span>
-                <span>چت</span>
+                <span class="icon"><img src="assets/icons/chat.png" alt="چت"></span><span>چت</span>
             </button>
             <button class="nav-item" data-tab="map">
-                <span class="icon"><img src="assets/icons/map.png" alt="نقشه"></span>
-                <span>نقشه</span>
+                <span class="icon"><img src="assets/icons/map.png" alt="نقشه"></span><span>نقشه</span>
             </button>
             <button class="nav-item" data-tab="games">
-                <span class="icon"><img src="assets/icons/game.png" alt="بازی"></span>
-                <span>بازی</span>
+                <span class="icon"><img src="assets/icons/game.png" alt="بازی"></span><span>بازی</span>
             </button>
             <button class="nav-item" data-tab="expenses">
-                <span class="icon"><img src="assets/icons/money.png" alt="حساب"></span>
-                <span>حساب کتاب</span>
+                <span class="icon"><img src="assets/icons/money.png" alt="حساب"></span><span>حساب کتاب</span>
             </button>
             <button class="nav-item" data-tab="memories">
-                <span class="icon"><img src="assets/icons/gallery.png" alt="خاطرات"></span>
-                <span>خاطرات</span>
+                <span class="icon"><img src="assets/icons/gallery.png" alt="خاطرات"></span><span>خاطرات</span>
             </button>
         </nav>
 
         <div class="tab-content">
-            <!-- تب چت -->
+
+            <!-- چت -->
             <div id="tab-chat" class="tab-pane active">
                 <div class="chat-container">
                     <div class="chat-header">
-                        <h2>گفتگوی گروهی</h2>
-                        <div style="display:flex;gap:8px;align-items:center;">
+                        <h2><img src="assets/icons/chat.png" class="header-icon"> گفتگوی گروهی</h2>
+                        <div class="header-actions">
                             <button id="install-btn" class="install-pwa-btn" style="display:none;"
-                                onclick="installPWA()">📲 نصب</button>
-                            <button id="logout-btn" class="logout-btn">🚪 خروج</button>
+                                onclick="installPWA()">
+                                <img src="assets/icons/install.png" style="width:16px;height:16px;object-fit:contain;">
+                                نصب
+                            </button>
+                            <button id="logout-btn" class="logout-btn">
+                                <img src="assets/icons/logout.png" style="width:16px;height:16px;object-fit:contain;">
+                                خروج
+                            </button>
                         </div>
                     </div>
-
                     <div class="chat-messages-wrapper" id="chat-messages-wrapper">
                         <div id="chat-messages" class="messages"></div>
                         <button class="scroll-to-bottom" id="scroll-to-bottom"
-                            onclick="document.getElementById('chat-messages-wrapper').scrollTo({top: document.getElementById('chat-messages-wrapper').scrollHeight, behavior: 'smooth'})">⬇</button>
+                            onclick="document.getElementById('chat-messages-wrapper').scrollTo({top:document.getElementById('chat-messages-wrapper').scrollHeight,behavior:'smooth'})">⬇</button>
                     </div>
-
                     <div class="chat-input-fixed">
                         <form id="chat-form" class="chat-input">
                             <input type="text" id="message-input" placeholder="پیامت رو بنویس..." autocomplete="off">
-                            <button type="submit">
-                                <img src="assets/icons/send.png" alt="ارسال"
-                                    style="width:20px; height:20px; object-fit:contain;">
-                            </button>
+                            <button type="submit"><img src="assets/icons/send.png" alt="ارسال"
+                                    style="width:20px;height:20px;object-fit:contain;"></button>
                         </form>
                     </div>
                 </div>
             </div>
 
+            <!-- نقشه -->
             <div id="tab-map" class="tab-pane">
-                <h2 style="padding: 0 20px;">🗺️ نقشه دوستان</h2>
+                <h2 class="tab-title"><img src="assets/icons/map.png" class="header-icon"> نقشه دوستان</h2>
                 <div id="map-container"></div>
                 <div class="map-controls">
                     <button id="share-location-btn" class="map-btn primary-btn">📍 اشتراک موقعیت</button>
@@ -109,8 +102,9 @@
                 </div>
             </div>
 
+            <!-- بازی -->
             <div id="tab-games" class="tab-pane">
-                <h2 style="margin-bottom:20px;">🎲 بازی‌های گروهی</h2>
+                <h2 class="tab-title"><img src="assets/icons/game.png" class="header-icon"> بازی‌های گروهی</h2>
                 <div class="games-grid">
                     <div class="game-card" data-game="bottle">
                         <span>🍾</span>
@@ -120,9 +114,10 @@
                 </div>
             </div>
 
+            <!-- حساب کتاب -->
             <div id="tab-expenses" class="tab-pane">
                 <div class="expenses-container">
-                    <h2 style="margin-bottom:20px;">💰 حساب کتاب گروهی</h2>
+                    <h2 class="tab-title"><img src="assets/icons/money.png" class="header-icon"> حساب کتاب گروهی</h2>
                     <form id="expense-form" class="expense-form-glass">
                         <div class="form-group full-width">
                             <label class="form-label">📝 بابت چی؟</label>
@@ -142,16 +137,17 @@
                         <button type="submit" class="submit-expense-btn">➕ ثبت هزینه</button>
                     </form>
                     <div id="balance-summary" class="balance-summary"></div>
-                    <h3 style="margin:20px 0 12px;">📋 لیست هزینه‌ها</h3>
+                    <h3>📋 لیست هزینه‌ها</h3>
                     <div id="expenses-list"></div>
                     <div id="settlements-list"></div>
                 </div>
             </div>
 
+            <!-- خاطرات -->
             <div id="tab-memories" class="tab-pane">
                 <div class="memories-container">
                     <div class="memories-header">
-                        <h2>📸 گالری خاطرات</h2>
+                        <h2 class="tab-title"><img src="assets/icons/gallery.png" class="header-icon"> گالری خاطرات</h2>
                         <button id="upload-memory-btn" class="upload-btn">📸 آپلود عکس</button>
                         <input type="file" id="memory-upload" accept="image/*" multiple hidden>
                     </div>
@@ -166,72 +162,28 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script type="module" src="js/app.js"></script>
 
-    <!-- PWA Script -->
     <script>
-        // PWA Script - کامل و تضمینی
         let deferredPrompt = null
-
-        // Service Worker
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('sw.js').then(reg => {
-                    console.log('✅ SW registered')
-                }).catch(() => { })
-            })
+            window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(r => console.log('✅ SW')).catch(() => { }))
         }
-
-        // گرفتن رویداد نصب
         window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault()
-            deferredPrompt = e
-            const btn = document.getElementById('install-btn')
-            if (btn) {
-                btn.style.display = 'block'
-            }
+            e.preventDefault(); deferredPrompt = e
+            const b = document.getElementById('install-btn'); if (b) b.style.display = 'block'
         })
-
-        // بعد از نصب
         window.addEventListener('appinstalled', () => {
             deferredPrompt = null
-            const btn = document.getElementById('install-btn')
-            if (btn) btn.style.display = 'none'
+            const b = document.getElementById('install-btn'); if (b) b.style.display = 'none'
         })
-
-        // تابع نصب
         window.installPWA = async function () {
-            const btn = document.getElementById('install-btn')
-
-            // اول: beforeinstallprompt
+            const b = document.getElementById('install-btn')
             if (deferredPrompt) {
-                try {
-                    await deferredPrompt.prompt()
-                    const result = await deferredPrompt.userChoice
-                    if (result.outcome === 'accepted') {
-                        console.log('✅ نصب شد')
-                        if (btn) btn.style.display = 'none'
-                    }
-                    deferredPrompt = null
-                    return
-                } catch (err) {
-                    console.log('prompt failed, trying alternative')
-                }
+                try { await deferredPrompt.prompt(); const r = await deferredPrompt.userChoice; if (r.outcome === 'accepted' && b) b.style.display = 'none'; deferredPrompt = null; return }
+                catch (e) { }
             }
-
-            // دوم: iOS
-            if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-                alert('📲 برای نصب:\n۱. دکمه Share (مربع با فلش) پایین صفحه رو بزن\n۲. گزینه "Add to Home Screen" رو انتخاب کن')
-                return
-            }
-
-            // سوم: اندروید بدون beforeinstallprompt
-            if (/Android/.test(navigator.userAgent)) {
-                // تلاش برای باز کردن منوی نصب کروم
-                alert('📲 برای نصب:\n۱. سه نقطه بالا سمت راست رو بزن\n۲. گزینه "Install app" یا "نصب برنامه" رو بزن')
-                return
-            }
-
-            // چهارم: دسکتاپ
-            alert('📲 برای نصب:\n۱. روی آیکون Install در نوار آدرس کلیک کن\nیا\n۲. از منوی مرورگر گزینه Install رو بزن')
+            if (/iPhone|iPad|iPod/.test(navigator.userAgent)) alert('📲 دکمه Share (مربع با فلش) پایین صفحه رو بزن\nسپس Add to Home Screen')
+            else if (/Android/.test(navigator.userAgent)) alert('📲 سه نقطه بالا سمت راست رو بزن\nسپس Install app')
+            else alert('📲 روی آیکون Install در نوار آدرس کلیک کن')
         }
     </script>
 </body>
