@@ -3,51 +3,47 @@
 
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Yey</title>
 
     <!-- Favicon -->
     <link rel="icon" type="image/png" href="assets/logomain.png">
+    
     <!-- Styles -->
     <link rel="stylesheet" href="css/style.css">
 
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
     <!-- PWA -->
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#0a0a0f">
     <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Yey">
-    <link rel="apple-touch-icon" href="assets/icons/icon-192.png">
+    <link rel="apple-touch-icon" href="assets/logomain.png">
 </head>
 
 <body>
-    <!-- صفحه ورود - ساده و تمیز -->
+    <!-- صفحه ورود -->
     <div id="auth-screen" class="screen active">
         <div class="auth-container" id="auth-container">
             <div class="auth-logo">
-                <img src="assets/logo.png" alt="logo"
-                    style="width:100%; height:100%; object-fit:cover; border-radius:18px;">
+                <img src="assets/logo.png" alt="logo" style="width:100%; height:100%; object-fit:cover; border-radius:18px;">
             </div>
             <p class="subtitle">اسمت رو وارد کن</p>
-
             <div class="input-wrapper">
-                <input type="text" id="nickname-input" placeholder="اسمت رو بنویس..." autocomplete="off" maxlength="20"
-                    autofocus>
+                <input type="text" id="nickname-input" placeholder="اسمت رو بنویس..." autocomplete="off" maxlength="20" autofocus>
             </div>
-
             <button id="type-login-btn" class="login-btn">ورود</button>
-
             <div id="login-message" class="login-message"></div>
-
             <p class="auth-footer">🔒 فقط دوستان مجاز</p>
         </div>
     </div>
 
     <!-- صفحه اصلی -->
     <div id="main-screen" class="screen">
-        <!-- نوار ناوبری پایین -->
         <nav class="bottom-nav">
             <button class="nav-item active" data-tab="chat">
                 <span class="icon"><img src="assets/icons/chat.png" alt="چت"></span>
@@ -71,7 +67,6 @@
             </button>
         </nav>
 
-        <!-- محتوای تب‌ها -->
         <div class="tab-content">
             <!-- تب چت -->
             <div id="tab-chat" class="tab-pane active">
@@ -79,27 +74,21 @@
                     <div class="chat-header">
                         <h2>گفتگوی گروهی</h2>
                         <div style="display:flex;gap:8px;align-items:center;">
-                            <button id="install-btn"
-                                style="display:none;padding:8px 12px;background:#d4a017;color:#fff;border:none;border-radius:10px;font-size:12px;cursor:pointer;font-family:inherit;">📲
-                                نصب</button>
+                            <button id="install-btn" class="install-pwa-btn" style="display:none;" onclick="installPWA()">📲 نصب</button>
                             <button id="logout-btn" class="logout-btn">🚪 خروج</button>
                         </div>
                     </div>
 
                     <div class="chat-messages-wrapper" id="chat-messages-wrapper">
                         <div id="chat-messages" class="messages"></div>
-                        <button class="scroll-to-bottom" id="scroll-to-bottom"
-                            onclick="document.getElementById('chat-messages-wrapper').scrollTo({top: document.getElementById('chat-messages-wrapper').scrollHeight, behavior: 'smooth'})">
-                            ⬇
-                        </button>
+                        <button class="scroll-to-bottom" id="scroll-to-bottom" onclick="document.getElementById('chat-messages-wrapper').scrollTo({top: document.getElementById('chat-messages-wrapper').scrollHeight, behavior: 'smooth'})">⬇</button>
                     </div>
 
                     <div class="chat-input-fixed">
                         <form id="chat-form" class="chat-input">
                             <input type="text" id="message-input" placeholder="پیامت رو بنویس..." autocomplete="off">
                             <button type="submit">
-                                <img src="assets/icons/send.png" alt="ارسال"
-                                    style="width:20px; height:20px; object-fit:contain;">
+                                <img src="assets/icons/send.png" alt="ارسال" style="width:20px; height:20px; object-fit:contain;">
                             </button>
                         </form>
                     </div>
@@ -110,12 +99,8 @@
                 <h2 style="padding: 0 20px;">🗺️ نقشه دوستان</h2>
                 <div id="map-container"></div>
                 <div class="map-controls">
-                    <button id="share-location-btn" class="map-btn primary-btn">
-                        📍 اشتراک موقعیت
-                    </button>
-                    <button id="add-pin-btn" class="map-btn">
-                        📌 پین جدید
-                    </button>
+                    <button id="share-location-btn" class="map-btn primary-btn">📍 اشتراک موقعیت</button>
+                    <button id="add-pin-btn" class="map-btn">📌 پین جدید</button>
                 </div>
             </div>
 
@@ -133,104 +118,113 @@
             <div id="tab-expenses" class="tab-pane">
                 <div class="expenses-container">
                     <h2 style="margin-bottom:20px;">💰 حساب کتاب گروهی</h2>
-
                     <form id="expense-form" class="expense-form-glass">
-                        <!-- بابت چی -->
                         <div class="form-group full-width">
                             <label class="form-label">📝 بابت چی؟</label>
                             <input type="text" id="expense-desc" placeholder="مثلاً: پیتزای امشب">
                         </div>
-
-                        <!-- مبلغ -->
                         <div class="form-group full-width">
                             <label class="form-label">💵 مبلغ (تومان)</label>
                             <input type="number" id="expense-amount" placeholder="مثلاً ۲۵۰۰۰۰">
                         </div>
-
-                        <!-- کی پرداخت کرد -->
                         <div class="form-group full-width">
                             <label class="form-label">👤 کی پرداخت کرد؟</label>
                             <select id="expense-paid-by">
                                 <option value="">👤 کی پرداخت کرد؟</option>
                             </select>
                         </div>
-
-                        <!-- کی‌ها بودن -->
                         <div class="form-group full-width" id="participants-container"></div>
-
-                        <!-- دکمه ثبت -->
                         <button type="submit" class="submit-expense-btn">➕ ثبت هزینه</button>
                     </form>
-
                     <div id="balance-summary" class="balance-summary"></div>
-
                     <h3 style="margin:20px 0 12px;">📋 لیست هزینه‌ها</h3>
                     <div id="expenses-list"></div>
                     <div id="settlements-list"></div>
                 </div>
             </div>
 
-            <!-- تب خاطرات -->
             <div id="tab-memories" class="tab-pane">
                 <div class="memories-container">
                     <div class="memories-header">
                         <h2>📸 گالری خاطرات</h2>
-                        <button id="upload-memory-btn" class="upload-btn">
-                            📸 آپلود عکس
-                        </button>
+                        <button id="upload-memory-btn" class="upload-btn">📸 آپلود عکس</button>
                         <input type="file" id="memory-upload" accept="image/*" multiple hidden>
                     </div>
                     <div id="memories-grid" class="memories-grid"></div>
                 </div>
             </div>
+        </div>
+    </div>
 
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script type="module" src="js/app.js"></script>
+    
+    <!-- PWA Script -->
+    <script>
+        let deferredPrompt = null
 
+        // ثبت Service Worker
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').then(reg => {
+                    console.log('✅ SW registered:', reg.scope)
+                }).catch(err => {
+                    console.log('SW failed:', err)
+                })
+            })
+        }
 
-            <!-- Scripts -->
-            <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-            <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-            <script type="module" src="js/app.js"></script>
-            <script>
-                // ثبت Service Worker
-                if ('serviceWorker' in navigator) {
-                    window.addEventListener('load', () => {
-                        navigator.serviceWorker.register('/sw.js').then(reg => {
-                            console.log('SW registered:', reg.scope)
-                        }).catch(err => {
-                            console.log('SW failed:', err)
-                        })
-                    })
-                }
+        // نصب PWA
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault()
+            deferredPrompt = e
+            const btn = document.getElementById('install-btn')
+            if (btn) {
+                btn.style.display = 'block'
+            }
+        })
 
-                // دکمه نصب
-                let deferredPrompt
-                window.addEventListener('beforeinstallprompt', (e) => {
-                    e.preventDefault()
-                    deferredPrompt = e
+        window.addEventListener('appinstalled', () => {
+            console.log('✅ PWA نصب شد')
+            deferredPrompt = null
+            const btn = document.getElementById('install-btn')
+            if (btn) btn.style.display = 'none'
+        })
 
-                    // نشون دادن دکمه نصب
-                    const btn = document.getElementById('install-btn')
-                    if (btn) {
-                        btn.style.display = 'block'
-                        btn.addEventListener('click', () => {
-                            deferredPrompt.prompt()
-                            deferredPrompt.userChoice.then(result => {
-                                if (result.outcome === 'accepted') {
-                                    console.log('نصب شد ✅')
-                                    btn.style.display = 'none'
-                                }
-                                deferredPrompt = null
-                            })
-                        })
+        // تابع نصب دستی
+        window.installPWA = function() {
+            if (deferredPrompt) {
+                deferredPrompt.prompt()
+                deferredPrompt.userChoice.then(result => {
+                    if (result.outcome === 'accepted') {
+                        console.log('✅ نصب شد')
+                        document.getElementById('install-btn').style.display = 'none'
                     }
+                    deferredPrompt = null
                 })
+            } else if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+                window.showToast?.('📲 برای نصب: دکمه Share رو بزن، سپس Add to Home Screen', 'info', 4000)
+            } else if (window.matchMedia('(display-mode: standalone)').matches) {
+                window.showToast?.('✅ قبلاً نصب شده!', 'success', 2000)
+            } else {
+                // نشون دادن دکمه برای حالتایی که beforeinstallprompt نیومده
+                const btn = document.getElementById('install-btn')
+                if (btn && btn.style.display === 'none') {
+                    btn.style.display = 'block'
+                }
+                window.showToast?.('📲 از منوی مرورگر گزینه Install رو بزن', 'info', 3000)
+            }
+        }
 
-                window.addEventListener('appinstalled', () => {
-                    console.log('نصب کامل شد!')
-                    const btn = document.getElementById('install-btn')
-                    if (btn) btn.style.display = 'none'
-                })
-            </script>
+        // چک کن قبلاً نصب شده
+        if (window.matchMedia('(display-mode: standalone)').matches) {
+            console.log('📱 در حالت standalone')
+            const btn = document.getElementById('install-btn')
+            if (btn) btn.style.display = 'none'
+        }
+    </script>
 </body>
 
 </html>

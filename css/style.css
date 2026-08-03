@@ -2632,3 +2632,31 @@ body {
         display: block !important;
     }
 }
+.install-pwa-btn {
+    padding: 8px 12px;
+    background: #d4a017;
+    color: #fff;
+    border: none;
+    border-radius: 10px;
+    font-size: 12px;
+    cursor: pointer;
+    font-family: inherit;
+    white-space: nowrap;
+    animation: pulseBtn 2s infinite;
+}
+
+@keyframes pulseBtn {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(212, 160, 23, 0.4); }
+    50% { box-shadow: 0 0 0 8px rgba(212, 160, 23, 0); }
+}
+
+/* چت موبایل */
+@media (max-width: 768px) {
+    .chat-input-fixed {
+        margin-bottom: 70px;
+    }
+    
+    .chat-messages-wrapper {
+        padding-bottom: 10px;
+    }
+}

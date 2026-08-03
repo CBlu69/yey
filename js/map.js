@@ -13,29 +13,11 @@ export function initMap(user) {
     let sharingWatchId = null
     let sharingStartTime = null
 
-    // ============ مسیریابی ============
-    window.navigateTo = (lat, lng, name) => {
-        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-        const geoUri = `geo:${lat},${lng}?q=${lat},${lng}(${encodeURIComponent(name || 'مقصد')})`
-        const googleMaps = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
-
-        if (isMobile && navigator.share) {
-            navigator.share({
-                title: `مسیریابی به ${name || 'مقصد'}`,
-                text: `مسیریابی به ${name || 'مقصد'}`,
-                url: googleMaps
-            }).catch(() => {
-                window.open(googleMaps, '_blank')
-            })
-        } else if (isMobile) {
-            window.location.href = geoUri
-            setTimeout(() => {
-                if (document.hasFocus()) window.open(googleMaps, '_blank')
-            }, 1000)
-        } else {
-            window.open(googleMaps, '_blank')
-        }
-    }
+  // ============ مسیریابی ============
+window.navigateTo = (lat, lng, name) => {
+    const googleMapsUrl = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`
+    window.open(googleMapsUrl, '_blank')
+}
 
     // ============ ساخت نقشه ============
     function createMap() {
