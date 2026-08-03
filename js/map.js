@@ -1,4 +1,4 @@
-// js/map.js - فشرده و بدون خطا
+// js/map.js - کامل با is_active
 import { supabase } from './supabase.js'
 import { getCurrentUser } from './auth.js'
 
@@ -29,7 +29,7 @@ export function initMap(user) {
     function updateUserMarker() {
         if (!userLocation || !map) return
         if (userMarker) userMarker.setLatLng(userLocation)
-        else userMarker = L.marker(userLocation, { icon: L.divIcon({ html: '<div style="font-size:24px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">📍</div>', className: 'user-marker', iconSize: [24,24] }) }).addTo(map).bindPopup('موقعیت من')
+        else userMarker = L.marker(userLocation, { icon: L.divIcon({ html: '<div style="font-size:24px;">📍</div>', className: 'user-marker', iconSize: [24,24] }) }).addTo(map).bindPopup('موقعیت من')
     }
 
     function setDefaultLocation() { if (!userLocation) { userLocation = { lat: 35.7483, lng: 51.8237 }; updateUserMarker() } }
@@ -43,7 +43,7 @@ export function initMap(user) {
             catch (err) { window.showToast('موقعیت در دسترس نیست', 'error'); return }
         }
         const cu = getCurrentUser(); if (!cu) return
-        await supabase.from('shared_locations').upsert({ user_id: String(cu.id), user_name: cu.name, user_avatar: cu.avatar || '👤', active: true, lat: userLocation.lat, lng: userLocation.lng, started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        await supabase.from('shared_locations').upsert({ user_id: String(cu.id), user_name: cu.name, user_avatar: cu.avatar || '👤', is_active: true, lat: userLocation.lat, lng: userLocation.lng, started_at: new Date().toISOString(), updated_at: new Date().toISOString() })
         sharingActive = true; sharingStartTime = Date.now()
         if (navigator.geolocation) sharingWatchId = navigator.geolocation.watchPosition(async (pos) => { userLocation = { lat: pos.coords.latitude, lng: pos.coords.longitude }; updateUserMarker(); if (sharingActive) await supabase.from('shared_locations').update({ lat: userLocation.lat, lng: userLocation.lng, updated_at: new Date().toISOString() }).eq('user_id', String(cu.id)); if (sharingMarker) sharingMarker.setLatLng(userLocation) }, () => {}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 })
         if (!sharingMarker) {
@@ -56,7 +56,7 @@ export function initMap(user) {
 
     async function stopSharing() {
         const cu = getCurrentUser(); sharingActive = false
-        if (cu) await supabase.from('shared_locations').update({ active: false, updated_at: new Date().toISOString() }).eq('user_id', String(cu.id))
+        if (cu) await supabase.from('shared_locations').update({ is_active: false, updated_at: new Date().toISOString() }).eq('user_id', String(cu.id))
         if (sharingWatchId && navigator.geolocation) { navigator.geolocation.clearWatch(sharingWatchId); sharingWatchId = null }
         if (sharingMarker) { map.removeLayer(sharingMarker); sharingMarker = null }
         if (sharingTimer) { clearInterval(sharingTimer); sharingTimer = null }
@@ -82,7 +82,7 @@ export function initMap(user) {
 
     async function checkActiveSharing() {
         const cu = getCurrentUser(); if (!cu) return
-        const { data } = await supabase.from('shared_locations').select('*').eq('user_id', String(cu.id)).eq('active', true).single()
+        const { data } = await supabase.from('shared_locations').select('*').eq('user_id', String(cu.id)).eq('is_active', true).single()
         if (!data) return
         sharingActive = true; sharingStartTime = new Date(data.started_at).getTime()
         if (data.lat && data.lng) { userLocation = { lat: data.lat, lng: data.lng }; updateUserMarker() }
@@ -100,7 +100,7 @@ export function initMap(user) {
         const { data: pins } = await supabase.from('pins').select('*').order('created_at', { ascending: false })
         if (pins) pins.forEach(pin => addPinToMap(pin))
         const { data: sharings } = await supabase.from('shared_locations').select('*')
-        if (sharings) sharings.filter(s => s.active === true).forEach(share => { if (share.user_id === String(cu?.id) || !share.lat || !share.lng) return; addFriendMarker(share) })
+        if (sharings) sharings.filter(s => s.is_active === true).forEach(share => { if (share.user_id === String(cu?.id) || !share.lat || !share.lng) return; addFriendMarker(share) })
     }
 
     function addFriendMarker(share) {
@@ -130,7 +130,7 @@ export function initMap(user) {
 
     function addPinToMap(pin) {
         const cu = getCurrentUser(); const isOwner = pin.user_id === cu?.id
-        const marker = L.marker([pin.latitude, pin.longitude], { icon: L.divIcon({ html: '<div style="font-size:28px;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.3))">📌</div>', className: 'pin-marker', iconSize: [28,28] }) }).addTo(map)
+        const marker = L.marker([pin.latitude, pin.longitude], { icon: L.divIcon({ html: '<div style="font-size:28px;">📌</div>', className: 'pin-marker', iconSize: [28,28] }) }).addTo(map)
         let popup = `<div style="text-align:center;min-width:150px;"><b>📌 ${pin.name}</b><br><small style="color:#9d9dab;">${pin.user_name||'ناشناس'}</small><br><small style="color:#9d9dab;">${new Date(pin.created_at).toLocaleDateString('fa-IR')}</small><br><button onclick="window.navigateTo(${pin.latitude},${pin.longitude},'${pin.name.replace(/'/g,"\\'")}')" style="margin-top:8px;padding:8px 16px;background:var(--accent);color:#fff;border:none;border-radius:20px;cursor:pointer;font-size:13px;font-family:inherit;">🧭 مسیریابی</button>`
         if (isOwner) popup += `<button onclick="window.deletePin(${pin.id})" style="margin-top:6px;padding:6px 14px;background:#ff4757;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:12px;font-family:inherit;">🗑️ حذف</button>`
         popup += '</div>'; marker.bindPopup(popup); allPins.push({ id: pin.id, marker })
@@ -146,7 +146,7 @@ export function initMap(user) {
 
     function addMyLocationButton() {
         if (!map) return
-        const MyLocationControl = L.Control.extend({
+        map.addControl(new (L.Control.extend({
             options: { position: 'topright' },
             onAdd: function() {
                 const btn = L.DomUtil.create('button', 'my-location-btn')
@@ -157,8 +157,7 @@ export function initMap(user) {
                 }
                 return btn
             }
-        })
-        map.addControl(new MyLocationControl())
+        }))()
     }
 
     supabase.channel('map-updates')
@@ -169,7 +168,7 @@ export function initMap(user) {
             if (share.user_id === String(cu?.id)) return
             const old = allPins.find(x => x.id === `share-${share.user_id}`); if (old?.marker) map.removeLayer(old.marker)
             allPins = allPins.filter(x => x.id !== `share-${share.user_id}`)
-            if (share.active && share.lat && share.lng) addFriendMarker(share)
+            if (share.is_active && share.lat && share.lng) addFriendMarker(share)
         })
         .subscribe()
 
