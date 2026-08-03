@@ -244,6 +244,29 @@ export function initMap(user) {
         map.addControl(new MyLocationControl())
     }
 
+    // Real-time برای location_shares
+    supabase.channel('location-updates')
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'location_shares' }, function (p) {
+            var share = p.new
+            var cu = getCurrentUser()
+            if (share.user_id === String(cu ? cu.id : '')) return
+            if (!share.lat || !share.lng) return
+            var old = allPins.find(function (x) { return x.id === 'share-' + share.user_id })
+            if (old && old.marker) map.removeLayer(old.marker)
+            allPins = allPins.filter(function (x) { return x.id !== 'share-' + share.user_id })
+            if (share.active) addFriendMarker(share)
+        })
+        .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'location_shares' }, function (p) {
+            var share = p.new
+            var cu = getCurrentUser()
+            if (share.user_id === String(cu ? cu.id : '')) return
+            var old = allPins.find(function (x) { return x.id === 'share-' + share.user_id })
+            if (old && old.marker) map.removeLayer(old.marker)
+            allPins = allPins.filter(function (x) { return x.id !== 'share-' + share.user_id })
+            if (share.active && share.lat && share.lng) addFriendMarker(share)
+        })
+        .subscribe()
+
     window.getMap = function () { return map }
     setTimeout(createMap, 500)
 }
