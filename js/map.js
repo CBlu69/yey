@@ -28,19 +28,11 @@ export function initMap(user) {
         )
     }
 
-// توی map.js، تابع updateUserMarker - آیکون موقعیت خودم
-function updateUserMarker() {
-    if (!userLocation || !map) return
-    if (userMarker) userMarker.setLatLng(userLocation)
-    else userMarker = L.marker(userLocation, {
-        icon: L.icon({
-            iconUrl: 'assets/icons/my-location.png',
-            iconSize: [32, 32],
-            iconAnchor: [16, 32],
-            popupAnchor: [0, -32]
-        })
-    }).addTo(map).bindPopup('موقعیت من')
-}
+    function updateUserMarker() {
+        if (!userLocation || !map) return
+        if (userMarker) userMarker.setLatLng(userLocation)
+        else userMarker = L.marker(userLocation, { icon: L.divIcon({ html: '<div style="font-size:24px;">📍</div>', className: 'user-marker', iconSize: [24,24] }) }).addTo(map).bindPopup('موقعیت من')
+    }
 
     function setDefaultLocation() { if (!userLocation) { userLocation = { lat: 35.7483, lng: 51.8237 }; updateUserMarker() } }
 
