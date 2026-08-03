@@ -163,67 +163,71 @@
     
     <!-- PWA Script -->
     <script>
-        let deferredPrompt = null
+      // PWA Script - کامل و تضمینی
+let deferredPrompt = null
 
-        // ثبت Service Worker
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').then(reg => {
-                    console.log('✅ SW registered:', reg.scope)
-                }).catch(err => {
-                    console.log('SW failed:', err)
-                })
-            })
-        }
+// Service Worker
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log('✅ SW registered')
+        }).catch(() => {})
+    })
+}
 
-        // نصب PWA
-        window.addEventListener('beforeinstallprompt', (e) => {
-            e.preventDefault()
-            deferredPrompt = e
-            const btn = document.getElementById('install-btn')
-            if (btn) {
-                btn.style.display = 'block'
+// گرفتن رویداد نصب
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault()
+    deferredPrompt = e
+    const btn = document.getElementById('install-btn')
+    if (btn) {
+        btn.style.display = 'block'
+    }
+})
+
+// بعد از نصب
+window.addEventListener('appinstalled', () => {
+    deferredPrompt = null
+    const btn = document.getElementById('install-btn')
+    if (btn) btn.style.display = 'none'
+})
+
+// تابع نصب
+window.installPWA = async function() {
+    const btn = document.getElementById('install-btn')
+    
+    // اول: beforeinstallprompt
+    if (deferredPrompt) {
+        try {
+            await deferredPrompt.prompt()
+            const result = await deferredPrompt.userChoice
+            if (result.outcome === 'accepted') {
+                console.log('✅ نصب شد')
+                if (btn) btn.style.display = 'none'
             }
-        })
-
-        window.addEventListener('appinstalled', () => {
-            console.log('✅ PWA نصب شد')
             deferredPrompt = null
-            const btn = document.getElementById('install-btn')
-            if (btn) btn.style.display = 'none'
-        })
-
-        // تابع نصب دستی
-        window.installPWA = function() {
-            if (deferredPrompt) {
-                deferredPrompt.prompt()
-                deferredPrompt.userChoice.then(result => {
-                    if (result.outcome === 'accepted') {
-                        console.log('✅ نصب شد')
-                        document.getElementById('install-btn').style.display = 'none'
-                    }
-                    deferredPrompt = null
-                })
-            } else if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
-                window.showToast?.('📲 برای نصب: دکمه Share رو بزن، سپس Add to Home Screen', 'info', 4000)
-            } else if (window.matchMedia('(display-mode: standalone)').matches) {
-                window.showToast?.('✅ قبلاً نصب شده!', 'success', 2000)
-            } else {
-                // نشون دادن دکمه برای حالتایی که beforeinstallprompt نیومده
-                const btn = document.getElementById('install-btn')
-                if (btn && btn.style.display === 'none') {
-                    btn.style.display = 'block'
-                }
-                window.showToast?.('📲 از منوی مرورگر گزینه Install رو بزن', 'info', 3000)
-            }
+            return
+        } catch (err) {
+            console.log('prompt failed, trying alternative')
         }
-
-        // چک کن قبلاً نصب شده
-        if (window.matchMedia('(display-mode: standalone)').matches) {
-            console.log('📱 در حالت standalone')
-            const btn = document.getElementById('install-btn')
-            if (btn) btn.style.display = 'none'
-        }
+    }
+    
+    // دوم: iOS
+    if (/iPhone|iPad|iPod/.test(navigator.userAgent)) {
+        alert('📲 برای نصب:\n۱. دکمه Share (مربع با فلش) پایین صفحه رو بزن\n۲. گزینه "Add to Home Screen" رو انتخاب کن')
+        return
+    }
+    
+    // سوم: اندروید بدون beforeinstallprompt
+    if (/Android/.test(navigator.userAgent)) {
+        // تلاش برای باز کردن منوی نصب کروم
+        alert('📲 برای نصب:\n۱. سه نقطه بالا سمت راست رو بزن\n۲. گزینه "Install app" یا "نصب برنامه" رو بزن')
+        return
+    }
+    
+    // چهارم: دسکتاپ
+    alert('📲 برای نصب:\n۱. روی آیکون Install در نوار آدرس کلیک کن\nیا\n۲. از منوی مرورگر گزینه Install رو بزن')
+}
     </script>
 </body>
 
