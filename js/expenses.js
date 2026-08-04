@@ -52,18 +52,68 @@ window.initExpensesTab = function (user) {
         if (error) return window.showToast('خطا', 'error')
         window.showToast('✅ ثبت شد', 'success')
         formEl.reset()
+        const selEl = document.getElementById('expense-paid-by-selected')
+        if (selEl) selEl.textContent = '👤 کی پرداخت کرد؟'
+        document.querySelectorAll('.payer-option').forEach(o => o.classList.remove('selected'))
         document.querySelectorAll('.participant-check').forEach(cb => cb.checked = true)
         loadAllData()
     }
 
     function fillSelectAndParticipants() {
+        document.querySelector('.payer-select')?.remove()
         payerSelect.innerHTML = '<option value="">👤 کی پرداخت کرد؟</option>'
         ALLOWED_USERS.forEach(name => {
             const u = USERS_DATABASE[name]
             if (!u) return
-            const av = u.avatar || '👤'
-            const img = (av.includes('/') || av.includes('.')) ? `<img src="${av}" style="width:22px;height:22px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">` : av
-            payerSelect.innerHTML += `<option value="${name}">${img} ${name}</option>`
+            payerSelect.innerHTML += `<option value="${name}">${name}</option>`
+        })
+        payerSelect.style.display = 'none'
+
+        const dropdown = document.createElement('div')
+        dropdown.className = 'payer-select'
+        dropdown.innerHTML = `
+            <button type="button" class="payer-select-btn" id="expense-paid-by-btn">
+                <span class="payer-selected" id="expense-paid-by-selected">👤 کی پرداخت کرد؟</span>
+                <span class="payer-arrow">▾</span>
+            </button>
+            <div class="payer-options" id="expense-paid-by-options" style="display:none;">
+                ${ALLOWED_USERS.map(name => {
+                    const u = USERS_DATABASE[name]
+                    if (!u) return ''
+                    const av = u.avatar || '👤'
+                    const img = (av.includes('/') || av.includes('.')) ? `<img src="${av}">` : av
+                    return `<button type="button" class="payer-option" data-value="${name}">${img} ${name}</button>`
+                }).join('')}
+            </div>
+        `
+        payerSelect.insertAdjacentElement('afterend', dropdown)
+
+        const btn = dropdown.querySelector('.payer-select-btn')
+        const options = dropdown.querySelector('.payer-options')
+        const selectedEl = dropdown.querySelector('.payer-selected')
+
+        btn.addEventListener('click', () => {
+            dropdown.classList.toggle('open')
+            options.style.display = dropdown.classList.contains('open') ? 'block' : 'none'
+        })
+        options.querySelectorAll('.payer-option').forEach(opt => {
+            opt.addEventListener('click', () => {
+                const name = opt.dataset.value
+                const u = USERS_DATABASE[name]
+                const av = u?.avatar || '👤'
+                const img = (av.includes('/') || av.includes('.')) ? `<img src="${av}">` : av
+                selectedEl.innerHTML = `${img} ${name}`
+                payerSelect.value = name
+                dropdown.classList.remove('open')
+                options.style.display = 'none'
+                options.querySelectorAll('.payer-option').forEach(o => o.classList.toggle('selected', o === opt))
+            })
+        })
+        document.addEventListener('click', (e) => {
+            if (!dropdown.contains(e.target)) {
+                dropdown.classList.remove('open')
+                options.style.display = 'none'
+            }
         })
 
         if (!participantsContainer) return

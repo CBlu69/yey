@@ -8,6 +8,83 @@ import { initMemories } from './memories.js'
 
 let currentUser = null
 
+// ==================== تم رنگی ====================
+const THEMES = ['purple', 'dark', 'blue', 'green', 'pink', 'orange']
+
+const savedTheme = localStorage.getItem('yey-theme')
+if (savedTheme && THEMES.includes(savedTheme)) {
+    document.documentElement.dataset.theme = savedTheme
+}
+
+function applyTheme(theme) {
+    if (THEMES.includes(theme)) {
+        document.documentElement.dataset.theme = theme
+        localStorage.setItem('yey-theme', theme)
+    }
+}
+
+function setupThemePicker() {
+    const btn = document.getElementById('theme-btn')
+    if (!btn) return
+
+    btn.addEventListener('click', () => {
+        const current = document.documentElement.dataset.theme || 'purple'
+        const overlay = document.createElement('div')
+        overlay.className = 'modal-overlay'
+        overlay.innerHTML = `
+            <div class="custom-modal" style="max-width:420px;">
+                <span class="modal-icon">🎨</span>
+                <div class="modal-title">تم رنگی</div>
+                <div class="modal-message">یه تم انتخاب کن:</div>
+                <div class="theme-grid">
+                    ${THEMES.map(t => `<button class="theme-swatch ${t === current ? 'active' : ''}" data-theme="${t}"></button>`).join('')}
+                </div>
+                <div class="modal-buttons">
+                    <button class="modal-btn cancel" onclick="this.closest('.modal-overlay').remove()">بستن</button>
+                </div>
+            </div>`
+        document.body.appendChild(overlay)
+
+        overlay.querySelectorAll('.theme-swatch').forEach(sw => {
+            sw.addEventListener('click', () => {
+                applyTheme(sw.dataset.theme)
+                overlay.remove()
+            })
+        })
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
+    })
+}
+
+// ==================== ریپل کلیک ====================
+document.addEventListener('click', (e) => {
+    const target = e.target.closest('.login-btn, .modal-btn, .chat-input button, .map-btn, .nav-item, .game-card, .upload-btn, .submit-expense-btn, .memory-view-btn, .memory-delete-btn, .voice-play-btn, .reaction-emoji, .reaction-badge, .message-menu button, .theme-swatch')
+    if (!target) return
+    const rect = target.getBoundingClientRect()
+    const size = Math.max(rect.width, rect.height)
+    const ripple = document.createElement('span')
+    ripple.className = 'ripple'
+    ripple.style.width = ripple.style.height = `${size}px`
+    ripple.style.left = `${e.clientX - rect.left - size / 2}px`
+    ripple.style.top = `${e.clientY - rect.top - size / 2}px`
+    target.appendChild(ripple)
+    setTimeout(() => ripple.remove(), 700)
+})
+
+// ==================== تیلت سه‌بعدی کارت‌های بازی ====================
+function setupTiltEffects() {
+    document.querySelectorAll('.game-card').forEach(card => {
+        card.addEventListener('mousemove', (e) => {
+            const r = card.getBoundingClientRect()
+            const x = (e.clientX - r.left) / r.width - 0.5
+            const y = (e.clientY - r.top) / r.height - 0.5
+            card.style.transform = `perspective(600px) rotateX(${(-y * 8).toFixed(2)}deg) rotateY(${(x * 8).toFixed(2)}deg) translateY(-4px)`
+        })
+        card.addEventListener('mouseleave', () => {
+            card.style.transform = ''
+        })
+    })
+}
+
 // ==================== توابع جایگزین alert و confirm ====================
 
 // جایگزین alert
@@ -237,6 +314,8 @@ function initAllModules(user) {
         initMap(user)
         initGames(user)
         initMemories(user)
+        setupThemePicker()
+        setupTiltEffects()
 
         // expenses رو با تاخیر صدا بزن
         setTimeout(() => {

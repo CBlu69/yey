@@ -1,4 +1,4 @@
-const CACHE_NAME = 'yey-v1'
+const CACHE_NAME = 'yey-v2'
 
 const urlsToCache = [
     '/',

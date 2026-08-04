@@ -12,6 +12,17 @@ let mediaRecorder = null
 let audioChunks = []
 let recordingTimer = null
 let recordingSeconds = 0
+let isRecording = false
+let voiceSchemaChecked = false
+let voiceHasChatContext = false
+let typingChannel = null
+let typingStopTimeout = null
+
+function getChatKey() {
+    return currentChatType === 'group' ? `group-${currentGroupId}` : `private-${currentReceiverId}`
+}
+
+const REACTION_EMOJIS = ['👍', '👎', '❤️', '🔥', '🥰', '👏', '😁', '🤔', '🤯', '😱', '😢', '🎉', '🤩', '🙏', '👌', '💯', '🤣', '⚡', '🏆', '💔', '😡', '😎', '😂', '😍']
 
 // ============ تابع کمکی آواتار ============
 function getAvatarHTML(avatar, size = 22) {
@@ -65,6 +76,8 @@ export function initChat(user) {
     setupGroupSelector()
     setupVoiceRecorder()
     setupPollButton()
+    setupAttachButton()
+    setupTypingIndicator()
 
     if (messagesWrapper && scrollBtn) {
         messagesWrapper.addEventListener('scroll', () => {
@@ -128,18 +141,25 @@ export function initChat(user) {
 
     // ==================== Real-time Voice ====================
     supabase.channel('voice-updates')
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'voice_messages' }, (payload) => {
-            if (currentChatType === 'group') {
-                displayVoiceMessage(payload.new)
-                scrollToBottom()
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'voice_messages' }, async (payload) => {
+            await checkVoiceSchema()
+            const v = payload.new
+            if (voiceChatMatches(v)) {
+                if (!document.getElementById(`msg-${v.id}`)) {
+                    displayVoiceMessage(v)
+                    scrollToBottom()
+                }
             }
+        })
+        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'voice_messages' }, (payload) => {
+            document.getElementById(`msg-${payload.old.id}`)?.remove()
         })
         .subscribe()
 
     // ==================== Real-time Polls ====================
     supabase.channel('poll-updates')
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'polls' }, (payload) => {
-            if (currentChatType === 'group' && payload.new.group_id === currentGroupId) {
+            if (currentChatType === 'group') {
                 if (!document.getElementById(`poll-${payload.new.id}`)) {
                     displayPoll(payload.new)
                     scrollToBottom()
@@ -200,6 +220,69 @@ export function initChat(user) {
         }
     })
 
+    // ==================== تایپینگ ایندیکیتور ====================
+    function setupTypingIndicator() {
+        const cu = getCurrentUser()
+        if (!cu || typingChannel) return
+
+        typingChannel = supabase.channel('typing-presence', {
+            config: { presence: { key: String(cu.id) } }
+        })
+
+        typingChannel.on('presence', { event: 'sync' }, () => updateTypingIndicator())
+
+        typingChannel.subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                await typingChannel.track({ id: String(cu.id), name: cu.name, typing: false, chat: getChatKey() })
+            }
+        })
+
+        messageInput.addEventListener('input', () => {
+            const c = getCurrentUser()
+            if (!c || !typingChannel) return
+            clearTimeout(typingStopTimeout)
+            typingChannel.track({ id: String(c.id), name: c.name, typing: true, chat: getChatKey() })
+            typingStopTimeout = setTimeout(() => {
+                typingChannel.track({ id: String(c.id), name: c.name, typing: false, chat: getChatKey() })
+            }, 1500)
+        })
+
+        chatForm.addEventListener('submit', () => {
+            const c = getCurrentUser()
+            if (typingChannel && c) {
+                clearTimeout(typingStopTimeout)
+                typingChannel.track({ id: String(c.id), name: c.name, typing: false, chat: getChatKey() })
+            }
+        })
+    }
+
+    function updateTypingIndicator() {
+        const el = document.getElementById('typing-indicator')
+        if (!el) return
+        const cu = getCurrentUser()
+        if (!typingChannel) { el.style.display = 'none'; return }
+
+        const state = typingChannel.presenceState() || {}
+        const chatKey = getChatKey()
+        const typers = []
+        Object.values(state).forEach(entries => {
+            (entries || []).forEach(p => {
+                if (p && p.typing && p.chat === chatKey && p.id !== String(cu?.id)) typers.push(p.name)
+            })
+        })
+
+        if (typers.length === 0) {
+            el.style.display = 'none'
+        } else {
+            const label = typers.length === 1
+                ? `${typers[0]} در حال نوشتن`
+                : `${typers.slice(0, 2).join(' و ')} در حال نوشتن`
+            const textEl = el.querySelector('.typing-text')
+            if (textEl) textEl.textContent = label
+            el.style.display = 'flex'
+        }
+    }
+
     // ==================== ریپلای ====================
     window.replyToMessage = (msgId, userName, content) => {
         replyingTo = { id: msgId, user_name: userName, content }
@@ -230,11 +313,18 @@ export function initChat(user) {
             pinned_by: cu.name
         })
         if (error) window.showToast('خطا در پین کردن', 'error')
-        else window.showToast('📌 پیام پین شد', 'success')
+        else {
+            window.showToast('📌 پیام پین شد', 'success')
+            loadPinnedMessage()
+        }
     }
 
     window.unpinMessage = async (msgId) => {
-        await supabase.from('pinned_messages').delete().eq('message_id', msgId)
+        const { error } = await supabase.from('pinned_messages').delete().eq('message_id', msgId)
+        if (!error) {
+            document.querySelector(`#pinned-${msgId}`)?.remove()
+            document.querySelector('.pinned-message')?.remove()
+        }
     }
 
     async function loadPinnedMessage() {
@@ -249,7 +339,11 @@ export function initChat(user) {
 
         if (!data || data.length === 0) return
         const pin = data[0]
-        const msg = pin.messages
+        let msg = pin.messages
+        if (!msg) {
+            const { data: m } = await supabase.from('messages').select('*').eq('id', pin.message_id).maybeSingle()
+            msg = m
+        }
         if (!msg || msg.group_id !== currentGroupId) return
 
         const pinDiv = document.createElement('div')
@@ -264,30 +358,42 @@ export function initChat(user) {
 
     // ==================== ری‌اکشن ====================
     window.toggleReactionPicker = (msgId, event) => {
-        event.stopPropagation()
-        document.querySelector('.message-menu')?.remove()
-        document.querySelector('.reaction-picker')?.remove()
+        event?.stopPropagation?.()
+        document.querySelector('.reaction-picker-overlay')?.remove()
 
-        const msgEl = document.getElementById(`msg-${msgId}`)
-        if (!msgEl) return
-        const picker = document.createElement('div')
-        picker.className = 'reaction-picker'
-        picker.innerHTML = ['❤️', '😂', '🔥', '😮', '👏', '😢'].map(r =>
-            `<span class="reaction-emoji" onclick="window.addReaction('${msgId}','${r}'); this.closest('.reaction-picker')?.remove();">${r}</span>`
-        ).join('')
-        msgEl.appendChild(picker)
+        const overlay = document.createElement('div')
+        overlay.className = 'reaction-picker-overlay'
+        overlay.innerHTML = `
+            <div class="reaction-picker" onclick="event.stopPropagation()">
+                <div class="reaction-picker-header">
+                    <span>واکنش</span>
+                    <button class="reaction-picker-close" onclick="this.closest('.reaction-picker-overlay')?.remove()">✕</button>
+                </div>
+                <div class="reaction-picker-grid">
+                    ${REACTION_EMOJIS.map(r => `<span class="reaction-emoji" data-emoji="${r}">${r}</span>`).join('')}
+                </div>
+                <button class="reaction-remove-all" onclick="window.removeAllMyReactions('${msgId}'); this.closest('.reaction-picker-overlay')?.remove();">🗑️ حذف واکنش‌های من</button>
+            </div>`
+        document.body.appendChild(overlay)
 
-        setTimeout(() => {
-            const closePicker = (e) => {
-                if (!picker.contains(e.target)) {
-                    picker.remove()
-                    document.removeEventListener('click', closePicker)
-                    document.removeEventListener('touchstart', closePicker)
-                }
-            }
-            document.addEventListener('click', closePicker)
-            document.addEventListener('touchstart', closePicker)
-        }, 100)
+        overlay.querySelectorAll('.reaction-emoji').forEach(el => {
+            el.addEventListener('click', () => {
+                window.addReaction(msgId, el.dataset.emoji)
+                overlay.remove()
+            })
+        })
+
+        overlay.addEventListener('click', () => overlay.remove())
+    }
+
+    window.removeAllMyReactions = async (msgId) => {
+        const cu = getCurrentUser()
+        if (!cu) return
+        await supabase.from('message_reactions')
+            .delete()
+            .eq('message_id', msgId)
+            .eq('user_id', String(cu.id))
+        refreshReactions(msgId)
     }
 
     window.addReaction = async (msgId, reaction) => {
@@ -309,7 +415,19 @@ export function initChat(user) {
                 reaction
             }])
         }
-        document.querySelector('.reaction-picker')?.remove()
+        document.querySelector('.reaction-picker-overlay')?.remove()
+        refreshReactions(msgId)
+    }
+
+    window.removeReaction = async (msgId, reaction) => {
+        const cu = getCurrentUser()
+        if (!cu) return
+        await supabase.from('message_reactions')
+            .delete()
+            .eq('message_id', msgId)
+            .eq('user_id', String(cu.id))
+            .eq('reaction', reaction)
+        refreshReactions(msgId)
     }
 
     async function refreshReactions(msgId) {
@@ -355,76 +473,224 @@ export function initChat(user) {
                      onclick="window.addReaction('${msgId}','${emoji}')" 
                      title="${info.users.join(', ')}">
                      ${emoji} ${info.count}
+                     ${isActive ? `<span class="reaction-remove" onclick="event.stopPropagation(); window.removeReaction('${msgId}','${emoji}')" title="حذف واکنش">×</span>` : ''}
                 </span>`
         }).join('')
     }
-    // ==================== ویس ====================
+    // ==================== ویس (تلگرامی) ====================
+    let recordingStream = null
+    let recordingCanceled = false
+    let recordingExt = 'webm'
+    let cancelArmed = false
+    let recordStartX = 0
+    let recordStartY = 0
+
+    function formatTime(sec) {
+        sec = Math.max(0, Math.floor(sec || 0))
+        return `${Math.floor(sec / 60)}:${(sec % 60).toString().padStart(2, '0')}`
+    }
+
+    async function checkVoiceSchema() {
+        if (voiceSchemaChecked) return voiceHasChatContext
+        try {
+            const { error } = await supabase.from('voice_messages').select('chat_type').limit(0)
+            voiceHasChatContext = !error
+        } catch (e) {
+            voiceHasChatContext = false
+        }
+        voiceSchemaChecked = true
+        return voiceHasChatContext
+    }
+
+    function voiceChatMatches(v) {
+        const cu = getCurrentUser()
+        if (!cu) return false
+        if (!voiceHasChatContext) return currentChatType === 'group'
+        if (currentChatType === 'group') {
+            return v.chat_type === 'group' && v.group_id === currentGroupId
+        }
+        return v.chat_type === 'private' && (
+            (String(v.user_id) === String(cu.id) && v.receiver_id === currentReceiverId) ||
+            (v.user_id === currentReceiverId && v.receiver_id === String(cu.id))
+        )
+    }
+
     function setupVoiceRecorder() {
         const voiceBtn = document.getElementById('voice-record-btn')
         if (!voiceBtn) return
-        voiceBtn.addEventListener('mousedown', startRecording)
-        voiceBtn.addEventListener('touchstart', startRecording)
-        voiceBtn.addEventListener('mouseup', stopRecording)
-        voiceBtn.addEventListener('touchend', stopRecording)
+        voiceBtn.addEventListener('pointerdown', (e) => {
+            recordStartX = e.clientX
+            recordStartY = e.clientY
+            startRecording(e)
+        })
+        document.addEventListener('pointermove', onRecordMove)
+        document.addEventListener('pointerup', stopRecording)
+        document.addEventListener('pointercancel', cancelRecording)
+        document.addEventListener('touchend', stopRecording)
+        document.getElementById('voice-cancel-btn')?.addEventListener('pointerdown', (e) => {
+            e.preventDefault()
+            cancelRecording()
+        })
+    }
+
+    function onRecordMove(e) {
+        if (!isRecording) return
+        const dx = e.clientX - recordStartX
+        const dy = e.clientY - recordStartY
+        cancelArmed = (Math.abs(dx) > 70 || Math.abs(dy) > 70)
+        const hint = document.querySelector('.voice-rec-hint')
+        if (hint) {
+            hint.textContent = cancelArmed ? 'برای لغو رها کن' : 'برای ارسال رها کن'
+            hint.classList.toggle('cancel-armed', cancelArmed)
+        }
+        const btn = document.getElementById('voice-record-btn')
+        if (btn) btn.style.opacity = cancelArmed ? '0.4' : '1'
+    }
+
+    function resetRecordGesture() {
+        cancelArmed = false
+        const hint = document.querySelector('.voice-rec-hint')
+        if (hint) { hint.textContent = 'برای ارسال رها کن'; hint.classList.remove('cancel-armed') }
+        const btn = document.getElementById('voice-record-btn')
+        if (btn) btn.style.opacity = ''
     }
 
     async function startRecording(e) {
         e.preventDefault()
+        if (isRecording) return
+        resetRecordGesture()
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-            mediaRecorder = new MediaRecorder(stream)
+            if (isRecording) { stream.getTracks().forEach(t => t.stop()); return }
+            isRecording = true
+            recordingStream = stream
+            recordingCanceled = false
             audioChunks = []
             recordingSeconds = 0
-            const timerEl = document.getElementById('voice-timer')
-            if (timerEl) timerEl.style.display = 'inline'
 
-            mediaRecorder.ondataavailable = (e) => audioChunks.push(e.data)
-            mediaRecorder.onstop = async () => {
-                const audioBlob = new Blob(audioChunks, { type: 'audio/webm' })
-                const cu = getCurrentUser()
-                const fileName = `voice_${Date.now()}.webm`
-                const { data, error } = await supabase.storage.from('voice-messages').upload(fileName, audioBlob)
-                if (error) { window.showToast('خطا در آپلود ویس', 'error'); return }
-                const { data: urlData } = supabase.storage.from('voice-messages').getPublicUrl(fileName)
-                await supabase.from('voice_messages').insert([{
-                    user_id: String(cu.id),
-                    user_name: cu.name,
-                    audio_url: urlData.publicUrl,
-                    duration: recordingSeconds
-                }])
+            let mime = ''
+            if (typeof MediaRecorder.isTypeSupported === 'function') {
+                if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mime = 'audio/webm;codecs=opus'
+                else if (MediaRecorder.isTypeSupported('audio/webm')) mime = 'audio/webm'
+                else if (MediaRecorder.isTypeSupported('audio/mp4')) mime = 'audio/mp4'
             }
+            mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined)
+            recordingExt = mime.includes('mp4') ? 'm4a' : 'webm'
 
+            mediaRecorder.ondataavailable = (ev) => { if (ev.data && ev.data.size > 0) audioChunks.push(ev.data) }
+            mediaRecorder.onerror = () => { window.showToast('خطا در ضبط ویس', 'error'); cancelRecording() }
+            mediaRecorder.onstop = handleVoiceStop
             mediaRecorder.start()
+
+            updateRecordingUI(true)
             recordingTimer = setInterval(() => {
                 recordingSeconds++
                 const timer = document.getElementById('voice-timer')
-                if (timer) timer.textContent = `${recordingSeconds}s`
+                if (timer) timer.textContent = formatTime(recordingSeconds)
             }, 1000)
-            const btn = document.getElementById('voice-record-btn')
-            if (btn) btn.classList.add('recording')
         } catch (err) {
             window.showToast('دسترسی به میکروفون داده نشد', 'error')
         }
     }
 
     function stopRecording() {
+        if (!isRecording || !mediaRecorder) return
+        if (mediaRecorder.state === 'recording') {
+            recordingCanceled = cancelArmed
+            isRecording = false
+            mediaRecorder.stop()
+            clearInterval(recordingTimer)
+            if (recordingStream) { recordingStream.getTracks().forEach(t => t.stop()); recordingStream = null }
+        }
+        resetRecordGesture()
+    }
+
+    function cancelRecording() {
+        recordingCanceled = true
+        isRecording = false
         if (mediaRecorder && mediaRecorder.state === 'recording') {
             mediaRecorder.stop()
-            mediaRecorder.stream.getTracks().forEach(t => t.stop())
             clearInterval(recordingTimer)
-            const timer = document.getElementById('voice-timer')
-            if (timer) { timer.textContent = '0s'; timer.style.display = 'none' }
-            document.getElementById('voice-record-btn')?.classList.remove('recording')
+        }
+        if (recordingStream) { recordingStream.getTracks().forEach(t => t.stop()); recordingStream = null }
+        audioChunks = []
+        resetRecordGesture()
+        updateRecordingUI(false)
+    }
+
+    async function handleVoiceStop() {
+        const mimeType = mediaRecorder?.mimeType || ''
+        const chunks = audioChunks.slice()
+        const seconds = recordingSeconds
+        audioChunks = []
+        mediaRecorder = null
+        recordingSeconds = 0
+        updateRecordingUI(false)
+
+        if (recordingCanceled) return
+        if (chunks.length === 0 || seconds < 1) { window.showToast('ویس خیلی کوتاه بود', 'error'); return }
+        const audioBlob = new Blob(chunks, { type: mimeType || 'audio/webm' })
+        if (audioBlob.size === 0) { window.showToast('صدا ضبط نشد', 'error'); return }
+        window.showToast('در حال ارسال ویس...')
+        try {
+            const cu = getCurrentUser()
+            if (!cu) return
+            const fileName = `voice_${Date.now()}.${recordingExt}`
+            const { error } = await supabase.storage.from('voice-messages').upload(fileName, audioBlob)
+            if (error) { window.showToast('خطا در آپلود ویس', 'error'); return }
+            const { data: urlData } = supabase.storage.from('voice-messages').getPublicUrl(fileName)
+            const msg = {
+                user_id: String(cu.id),
+                user_name: cu.name,
+                audio_url: urlData.publicUrl,
+                duration: seconds
+            }
+            if (await checkVoiceSchema()) {
+                msg.user_avatar = cu.avatar || '👤'
+                msg.chat_type = currentChatType
+                if (currentChatType === 'group') msg.group_id = currentGroupId
+                else msg.receiver_id = currentReceiverId
+            }
+            const { error: insErr } = await supabase.from('voice_messages').insert([msg])
+            if (insErr) window.showToast('خطا در ارسال ویس', 'error')
+        } catch (err) {
+            window.showToast('خطا در ارسال ویس', 'error')
         }
     }
 
-    function displayVoiceMessage(msg) {
+    function updateRecordingUI(on) {
+        const form = document.getElementById('chat-form')
+        const bar = document.getElementById('voice-recording-bar')
+        const btn = document.getElementById('voice-record-btn')
+        if (form) form.style.display = on ? 'none' : 'flex'
+        if (bar) bar.style.display = on ? 'flex' : 'none'
+        if (btn) btn.classList.toggle('recording', on)
+        const timer = document.getElementById('voice-timer')
+        if (timer) timer.textContent = '0:00'
+    }
+
+    function voiceWaveBars(seed, count = 24) {
+        seed = String(seed || '')
+        let h = 7
+        for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0
+        const bars = []
+        for (let i = 0; i < count; i++) {
+            h = (h * 1103515245 + 12345) >>> 0
+            const height = 22 + ((h % 100) / 100) * 78
+            bars.push(`<div class="voice-wave-bar" style="height:${height.toFixed(1)}%"></div>`)
+        }
+        return bars.join('')
+    }
+
+    function displayVoiceMessage(msg, index) {
         const cu = getCurrentUser()
         const isSent = msg.user_id === String(cu.id)
         const div = document.createElement('div')
         div.className = `message ${isSent ? 'sent' : 'received'}`
         div.id = `msg-${msg.id}`
         div.style.position = 'relative'
+        if (index !== undefined) div.style.animationDelay = Math.min(index, 40) * 40 + 'ms'
+        div.dataset.audioUrl = msg.audio_url || ''
 
         div.addEventListener('contextmenu', (e) => {
             e.preventDefault()
@@ -435,14 +701,23 @@ export function initChat(user) {
             showVoiceMenu(msg.id, e)
         })
 
+        const bars = voiceWaveBars(msg.id || msg.audio_url, 24)
+        const avatar = msg.user_avatar || USERS_DATABASE[msg.user_name]?.avatar
         div.innerHTML = `
-            <div class="sender">${getAvatarHTML(msg.user_avatar)} ${msg.user_name || 'ناشناس'}</div>
+            <div class="sender">${getAvatarHTML(avatar)} ${msg.user_name || 'ناشناس'}</div>
             <div class="voice-message">
-                <button class="voice-play-btn" onclick="window.playVoice(this, '${msg.audio_url}')">▶️</button>
-                <div class="voice-wave">${Array.from({ length: 15 }, () => `<div class="voice-wave-bar" style="height:${Math.random() * 25 + 5}px"></div>`).join('')}</div>
-                <span class="voice-duration">${msg.duration || 0}s</span>
+                <button class="voice-play-btn" data-voice-id="${msg.id}" onclick="window.playVoice(this, '${msg.audio_url}')">▶️</button>
+                <div class="voice-player">
+                    <div class="voice-wave">
+                        <div class="voice-wave-bars">${bars}</div>
+                        <div class="voice-wave-progress"><div class="voice-wave-bars">${bars}</div></div>
+                    </div>
+                    <div class="voice-player-footer">
+                        <span class="voice-duration">${formatTime(msg.duration)}</span>
+                        <span class="voice-time-remaining" style="display:none;"></span>
+                    </div>
+                </div>
             </div>
-            ${isSent ? `<div class="msg-actions" style="position:absolute;top:-8px;left:-8px;"><button class="msg-action-btn delete-btn" onclick="window.deleteVoice('${msg.id}', '${msg.audio_url}')">🗑️</button></div>` : ''}
         `
         messagesContainer.appendChild(div)
     }
@@ -453,29 +728,34 @@ export function initChat(user) {
         const msgEl = document.getElementById(`msg-${msgId}`)
         if (!msgEl) return
         const isSent = msgEl.classList.contains('sent')
+        const senderName = msgEl.querySelector('.sender')?.textContent?.trim() || ''
+
         const menu = document.createElement('div')
         menu.className = 'message-menu'
         menu.innerHTML = `
-            <button onclick="window.toggleReactionPicker('${msgId}', event)" title="ری‌اکشن">😀</button>
-            ${isSent || isAdmin() ? `<button onclick="window.deleteVoice('${msgId}'); document.querySelector('.message-menu')?.remove();" class="danger" title="حذف">🗑️</button>` : ''}
+            <div class="menu-item" data-action="reply">↩️ <span>پاسخ</span></div>
+            <div class="menu-item" data-action="react">😀 <span>ری‌اکشن</span></div>
+            ${isSent || isAdmin() ? `<div class="menu-item danger" data-action="delete">🗑️ <span>حذف</span></div>` : ''}
         `
-        msgEl.appendChild(menu)
-        setTimeout(() => {
-            const closeMenu = (e) => {
-                if (!menu.contains(e.target)) {
-                    menu.remove()
-                    document.removeEventListener('click', closeMenu)
-                    document.removeEventListener('touchstart', closeMenu)
-                }
-            }
-            document.addEventListener('click', closeMenu)
-            document.addEventListener('touchstart', closeMenu)
-        }, 100)
+        positionContextMenu(menu, msgEl)
+        setupMenuClose(menu)
+
+        menu.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', async (e) => {
+                const action = item.dataset.action
+                menu.remove()
+                if (action === 'reply') window.replyToMessage(msgId, senderName, '🎤 پیام صوتی')
+                else if (action === 'react') window.toggleReactionPicker(msgId, e)
+                else if (action === 'delete') window.deleteVoice(msgId, msgEl.dataset.audioUrl)
+            })
+        })
     }
 
     window.deleteVoice = async (voiceId, audioUrl) => {
         const confirmed = await window.showConfirm('ویس حذف بشه؟', 'حذف ویس')
         if (!confirmed) return
+        const el = document.getElementById(`msg-${voiceId}`)
+        if (!audioUrl && el) audioUrl = el.dataset.audioUrl || ''
         const { error } = await supabase.from('voice_messages').delete().eq('id', voiceId)
         if (audioUrl) {
             const urlParts = audioUrl.split('/')
@@ -492,22 +772,64 @@ export function initChat(user) {
         }
     }
 
+    let currentVoice = null
+
     window.playVoice = (btn, url) => {
-        if (btn.classList.contains('playing')) {
-            btn._audio?.pause()
-            btn.textContent = '▶️'
-            btn.classList.remove('playing')
+        const wave = btn.closest('.voice-message')?.querySelector('.voice-wave')
+        if (currentVoice && currentVoice.btn === btn) {
+            if (currentVoice.audio.paused) {
+                currentVoice.audio.play()
+                setVoiceBtn(btn, true)
+            } else {
+                currentVoice.audio.pause()
+                setVoiceBtn(btn, false)
+            }
             return
         }
+        stopAllVoices()
         const audio = new Audio(url)
-        btn._audio = audio
-        btn.textContent = '⏸'
-        btn.classList.add('playing')
-        audio.play()
-        audio.onended = () => {
-            btn.textContent = '▶️'
-            btn.classList.remove('playing')
+        currentVoice = { audio, btn, wave }
+        setVoiceBtn(btn, true)
+        audio.addEventListener('timeupdate', () => {
+            if (wave && audio.duration) {
+                const pct = Math.min(100, (audio.currentTime / audio.duration) * 100)
+                wave.classList.add('playing')
+                wave.style.setProperty('--vp', pct + '%')
+            }
+            const rem = wave?.querySelector('.voice-time-remaining')
+            if (rem && audio.duration) {
+                rem.style.display = ''
+                rem.textContent = formatTime(audio.duration - audio.currentTime)
+            }
+        })
+        audio.addEventListener('loadedmetadata', () => {
+            const rem = wave?.querySelector('.voice-time-remaining')
+            if (rem && audio.duration) {
+                rem.style.display = ''
+                rem.textContent = formatTime(audio.duration)
+            }
+        })
+        audio.addEventListener('ended', () => stopAllVoices())
+        audio.addEventListener('error', () => { window.showToast('پخش ویس ممکن نشد', 'error'); stopAllVoices() })
+        audio.play().catch(() => { window.showToast('پخش ویس ممکن نشد', 'error'); stopAllVoices() })
+    }
+
+    function stopAllVoices() {
+        if (currentVoice) {
+            try { currentVoice.audio.pause() } catch (e) { }
+            currentVoice = null
         }
+        document.querySelectorAll('.voice-play-btn.playing').forEach(b => setVoiceBtn(b, false))
+        document.querySelectorAll('.voice-wave.playing').forEach(w => {
+            w.classList.remove('playing')
+            w.style.setProperty('--vp', '0%')
+        })
+        document.querySelectorAll('.voice-time-remaining').forEach(el => { el.style.display = 'none' })
+    }
+
+    function setVoiceBtn(btn, playing) {
+        btn.classList.toggle('playing', playing)
+        btn.textContent = playing ? '⏸' : '▶️'
     }
 
     // ==================== نظرسنجی ====================
@@ -556,13 +878,49 @@ export function initChat(user) {
             await supabase.from('polls').insert([{
                 question,
                 options: JSON.stringify(options),
-                created_by: cu.name,
-                group_id: currentGroupId
+                created_by: cu.name
             }])
             overlay.remove()
             window.showToast('نظرسنجی ایجاد شد 📊', 'success')
         })
         overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
+    }
+
+    // ==================== منوی افزودن (سند) ====================
+    function setupAttachButton() {
+        document.getElementById('attach-btn')?.addEventListener('click', openAttachMenu)
+    }
+
+    function openAttachMenu() {
+        document.querySelector('.message-menu')?.remove()
+        const menu = document.createElement('div')
+        menu.className = 'message-menu attach-menu'
+        menu.innerHTML = `
+            <div class="menu-item" data-action="poll">📊 <span>نظرسنجی</span></div>
+            <div class="menu-item" data-action="location">📍 <span>اشتراک موقعیت</span></div>
+            <div class="menu-item" data-action="memory">🖼️ <span>خاطره جدید</span></div>
+        `
+        const btn = document.getElementById('attach-btn')
+        const rect = btn.getBoundingClientRect()
+        document.body.appendChild(menu)
+        menu.style.position = 'fixed'
+        menu.style.bottom = (window.innerHeight - rect.top + 10) + 'px'
+        menu.style.right = Math.max(8, Math.min(rect.right - menu.offsetWidth, window.innerWidth - 8)) + 'px'
+        setupMenuClose(menu)
+
+        menu.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const action = item.dataset.action
+                menu.remove()
+                if (action === 'poll') openPollCreator()
+                else if (action === 'location') {
+                    document.querySelector('.nav-item[data-tab="map"]')?.click()
+                    window.showToast('📍 موقعیتت رو به اشتراک بذار', 'success')
+                } else if (action === 'memory') {
+                    document.querySelector('.nav-item[data-tab="memories"]')?.click()
+                }
+            })
+        })
     }
 
     async function displayPoll(poll) {
@@ -626,7 +984,6 @@ export function initChat(user) {
         const { data: polls } = await supabase
             .from('polls')
             .select('*')
-            .eq('group_id', currentGroupId)
             .order('created_at', { ascending: true })
         if (polls) {
             polls.forEach(poll => {
@@ -638,6 +995,50 @@ export function initChat(user) {
     }
 
     // ==================== منوی پیام ====================
+    function positionContextMenu(menu, msgEl) {
+        document.body.appendChild(menu)
+        const rect = msgEl.getBoundingClientRect()
+        const mRect = menu.getBoundingClientRect()
+        let top = rect.top - mRect.height - 8
+        if (top < 8) top = Math.min(rect.bottom + 8, window.innerHeight - mRect.height - 8)
+        const left = Math.max(8, Math.min(rect.left + rect.width / 2 - mRect.width / 2, window.innerWidth - mRect.width - 8))
+        menu.style.position = 'fixed'
+        menu.style.top = top + 'px'
+        menu.style.left = left + 'px'
+        menu.style.margin = '0'
+    }
+
+    function setupMenuClose(menu) {
+        setTimeout(() => {
+            const close = (e) => {
+                if (!menu.contains(e.target)) {
+                    menu.remove()
+                    document.removeEventListener('click', close)
+                    document.removeEventListener('touchstart', close)
+                }
+            }
+            document.addEventListener('click', close)
+            document.addEventListener('touchstart', close)
+        }, 100)
+    }
+
+    window.copyMessage = async (text) => {
+        if (!text) { window.showToast('چیزی برای کپی نیست', 'warning'); return }
+        try {
+            await navigator.clipboard.writeText(text)
+            window.showToast('کپی شد 📋', 'success')
+        } catch (e) {
+            const ta = document.createElement('textarea')
+            ta.value = text
+            ta.style.cssText = 'position:fixed;opacity:0;'
+            document.body.appendChild(ta)
+            ta.select()
+            try { document.execCommand('copy'); window.showToast('کپی شد 📋', 'success') }
+            catch (err) { window.showToast('کپی ممکن نشد', 'error') }
+            ta.remove()
+        }
+    }
+
     function showMessageMenu(msgId, event) {
         event.stopPropagation()
         document.querySelector('.message-menu')?.remove()
@@ -651,35 +1052,39 @@ export function initChat(user) {
         const menu = document.createElement('div')
         menu.className = 'message-menu'
         menu.innerHTML = `
-            <button onclick="window.replyToMessage('${msgId}','${senderName.replace(/'/g, "\\'")}','${msgContent.replace(/'/g, "\\'")}'); document.querySelector('.message-menu')?.remove();" class="reply-menu-btn" title="پاسخ">↩️</button>
-            <button onclick="window.toggleReactionPicker('${msgId}', event)" title="ری‌اکشن">😀</button>
-            ${currentChatType === 'group' ? `<button onclick="window.pinMessage('${msgId}'); document.querySelector('.message-menu')?.remove();" class="pin-menu-btn" title="پین">📌</button>` : ''}
-            ${isSent ? `<button onclick="window.editMessage('${msgId}','${msgContent.replace(/'/g, "\\'")}'); document.querySelector('.message-menu')?.remove();" title="ویرایش">✏️</button>` : ''}
-            ${isSent || isAdmin() ? `<button onclick="window.deleteMessage('${msgId}'); document.querySelector('.message-menu')?.remove();" class="danger" title="حذف">🗑️</button>` : ''}
+            <div class="menu-item" data-action="reply">↩️ <span>پاسخ</span></div>
+            <div class="menu-item" data-action="react">😀 <span>ری‌اکشن</span></div>
+            <div class="menu-item" data-action="copy">📋 <span>کپی</span></div>
+            ${currentChatType === 'group' ? `<div class="menu-item" data-action="pin">📌 <span>پین</span></div>` : ''}
+            ${isSent ? `<div class="menu-item" data-action="edit">✏️ <span>ویرایش</span></div>` : ''}
+            ${isSent || isAdmin() ? `<div class="menu-item danger" data-action="delete">🗑️ <span>حذف</span></div>` : ''}
         `
-        msgEl.appendChild(menu)
+        positionContextMenu(menu, msgEl)
+        setupMenuClose(menu)
 
-        setTimeout(() => {
-            const closeMenu = (e) => {
-                if (!menu.contains(e.target)) {
-                    menu.remove()
-                    document.removeEventListener('click', closeMenu)
-                    document.removeEventListener('touchstart', closeMenu)
-                }
-            }
-            document.addEventListener('click', closeMenu)
-            document.addEventListener('touchstart', closeMenu)
-        }, 100)
+        menu.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', async (e) => {
+                const action = item.dataset.action
+                menu.remove()
+                if (action === 'reply') window.replyToMessage(msgId, senderName, msgContent)
+                else if (action === 'react') window.toggleReactionPicker(msgId, e)
+                else if (action === 'copy') await window.copyMessage(msgContent)
+                else if (action === 'pin') window.pinMessage(msgId)
+                else if (action === 'edit') window.editMessage(msgId, msgContent)
+                else if (action === 'delete') window.deleteMessage(msgId)
+            })
+        })
     }
 
     // ==================== نمایش پیام ====================
-    function displayMessage(msg) {
+    function displayMessage(msg, index) {
         const cu = getCurrentUser()
         const isSent = msg.user_id === String(cu.id)
         const div = document.createElement('div')
         div.className = `message ${isSent ? 'sent' : 'received'}`
         div.id = `msg-${msg.id}`
         div.style.position = 'relative'
+        if (index !== undefined) div.style.animationDelay = Math.min(index, 40) * 40 + 'ms'
 
         // کامپیوتر: راست‌کلیک
         div.addEventListener('contextmenu', (e) => {
@@ -707,10 +1112,12 @@ export function initChat(user) {
         div.innerHTML = `
             <div class="sender">${getAvatarHTML(msg.user_avatar)} ${msg.user_name || 'ناشناس'}</div>
             ${replyHTML}
-            <div class="msg-content">${msg.content}</div>
+            <div class="msg-content"></div>
             <div class="time">${time}${msg.edited ? ' <span class="edited-tag">ویرایش شده</span>' : ''}</div>
         `
+        div.querySelector('.msg-content').textContent = msg.content || ''
         messagesContainer.appendChild(div)
+
         refreshReactions(msg.id)
     }
 
@@ -849,6 +1256,15 @@ export function initChat(user) {
     async function loadMessages() {
         document.querySelectorAll('.poll-container').forEach(el => el.remove())
 
+        messagesContainer.innerHTML = `
+            <div class="skeleton-chat">
+                <div class="skeleton-bubble received"></div>
+                <div class="skeleton-bubble sent"></div>
+                <div class="skeleton-bubble received"></div>
+                <div class="skeleton-bubble sent"></div>
+                <div class="skeleton-bubble received"></div>
+            </div>`
+
         let query = supabase.from('messages').select('*').order('created_at', { ascending: true }).limit(100)
         if (currentChatType === 'group') query = query.eq('chat_type', 'group').eq('group_id', currentGroupId)
         else {
@@ -858,12 +1274,33 @@ export function initChat(user) {
             )
         }
         const { data } = await query
+        let voices = []
+        if (await checkVoiceSchema()) {
+            let voiceQuery = supabase.from('voice_messages').select('*')
+            if (currentChatType === 'group') voiceQuery = voiceQuery.eq('chat_type', 'group').eq('group_id', currentGroupId)
+            else {
+                const cu = getCurrentUser()
+                voiceQuery = voiceQuery.eq('chat_type', 'private').or(
+                    `and(user_id.eq.${String(cu.id)},receiver_id.eq.${currentReceiverId}),and(user_id.eq.${currentReceiverId},receiver_id.eq.${String(cu.id)})`
+                )
+            }
+            const { data: vd } = await voiceQuery
+            voices = vd || []
+        } else if (currentChatType === 'group') {
+            const { data: vd } = await supabase.from('voice_messages').select('*').order('created_at', { ascending: true })
+            voices = vd || []
+        }
+        const all = [
+            ...(data || []).map(m => ({ ...m, kind: 'text' })),
+            ...voices.map(v => ({ ...v, kind: 'voice' }))
+        ].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
         messagesContainer.innerHTML = ''
-        if (data?.length > 0) data.forEach(msg => displayMessage(msg))
+        if (all.length > 0) all.forEach((msg, i) => msg.kind === 'voice' ? displayVoiceMessage(msg, i) : displayMessage(msg, i))
         else messagesContainer.innerHTML = '<div style="text-align:center;color:#9d9dab;padding:40px;"><span style="font-size:40px;">💬</span><p>پیامی نیست</p></div>'
         scrollToBottom()
 
         if (currentChatType === 'group') loadPolls()
+        updateTypingIndicator()
     }
 
     async function setupGroupSelector() {

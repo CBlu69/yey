@@ -66,6 +66,7 @@
                     <div class="chat-header">
                         <h2><img src="assets/icons/chat.png" class="header-icon"> گفتگوی گروهی</h2>
                         <div class="header-actions">
+                            <button id="theme-btn" class="logout-btn" title="تم رنگی">🎨</button>
                             <button id="install-btn" class="install-pwa-btn" style="display:none;"
                                 onclick="installPWA()">
                                 <img src="assets/icons/install.png" style="width:16px;height:16px;object-fit:contain;">
@@ -83,15 +84,21 @@
                             onclick="document.getElementById('chat-messages-wrapper').scrollTo({top:document.getElementById('chat-messages-wrapper').scrollHeight,behavior:'smooth'})">⬇</button>
                     </div>
                     <div class="chat-input-fixed">
+                        <div id="typing-indicator" class="typing-indicator" style="display:none;">
+                            <span class="typing-text"></span>
+                            <span class="typing-dots"><span></span><span></span><span></span></span>
+                        </div>
                         <div id="reply-preview-container"></div>
                         <form id="chat-form" class="chat-input">
+                            <button type="button" id="attach-btn" class="attach-btn" title="افزودن">
+                                📎
+                            </button>
+                            <input type="text" id="message-input" placeholder="پیامت رو بنویس..." autocomplete="off">
                             <button type="button" id="voice-record-btn" class="voice-record-btn"
                                 title="نگه دار برای ضبط ویس">
                                 <img src="assets/icons/mic.png" alt="ویس"
                                     style="width:20px;height:20px;object-fit:contain;">
                             </button>
-                            <span id="voice-timer" class="voice-timer" style="display:none;">0s</span>
-                            <input type="text" id="message-input" placeholder="پیامت رو بنویس..." autocomplete="off">
                             <button type="button" id="poll-btn" title="نظرسنجی">
                                 <img src="assets/icons/poll.png" alt="نظرسنجی"
                                     style="width:18px;height:18px;object-fit:contain;">
@@ -101,6 +108,14 @@
                                     style="width:20px;height:20px;object-fit:contain;">
                             </button>
                         </form>
+                        <div id="voice-recording-bar" class="voice-recording-bar" style="display:none;">
+                            <button type="button" id="voice-cancel-btn" class="voice-cancel-btn" title="لغو ضبط">✕</button>
+                            <div class="voice-rec-status">
+                                <span class="voice-rec-dot"></span>
+                                <span id="voice-timer">0:00</span>
+                            </div>
+                            <span class="voice-rec-hint">برای ارسال رها کن</span>
+                        </div>
                     </div>
                 </div>
             </div>
