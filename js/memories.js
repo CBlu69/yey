@@ -3,6 +3,7 @@ import { supabase } from './supabase.js'
 import { getCurrentUser } from './auth.js'
 
 let realtimeSetup = false
+let migratingIds = new Set()
 
 export function initMemories(user) {
     const memoriesGrid = document.getElementById('memories-grid')
@@ -13,6 +14,7 @@ export function initMemories(user) {
     
     loadMemories()
     setupRealtime()
+    setupTodayMemoryToast()
     
     uploadBtn?.addEventListener('click', () => uploadInput?.click())
     
@@ -28,21 +30,30 @@ export function initMemories(user) {
             
             const caption = await window.showPrompt('📝 توضیح (اختیاری)', '')
             
-            const reader = new FileReader()
-            reader.onload = async () => {
+            try {
+                // آپلود مستقیم به Storage (نه دیتابیس — رفع کندی)
+                const ext = (file.name.split('.').pop() || 'jpg').toLowerCase().replace('jpeg', 'jpg')
+                const path = `mem_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+                const { error } = await supabase.storage.from('memories').upload(path, file)
+                if (error) {
+                    window.showToast('⚠️ باکت memories ساخته نشده؛ sql/setup-all.sql را اجرا کن', 'error', 5000)
+                    continue
+                }
+                const { data: urlData } = supabase.storage.from('memories').getPublicUrl(path)
                 await supabase.from('memories').insert([{
-                    image_url: reader.result,
+                    image_url: urlData.publicUrl,
                     caption: caption || '',
                     user_id: String(currentUser.id),
                     user_name: String(currentUser.name),
                     created_at: new Date().toISOString()
                 }])
-                loadMemories()
                 window.showToast('عکس آپلود شد 📸', 'success')
+            } catch (err) {
+                window.showToast('خطا در آپلود عکس', 'error')
             }
-            reader.readAsDataURL(file)
         }
         uploadInput.value = ''
+        loadMemories()
     })
     
     window.deleteMemory = async (id) => {
@@ -116,6 +127,29 @@ export function initMemories(user) {
         }
         
         const currentUser = getCurrentUser()
+
+        // ===== «خاطره‌ی امروز» — عکس پارسال همین روز =====
+        const todayMemories = data.filter(m => isSameMonthDay(m.created_at, new Date()) && !isToday(m.created_at))
+        if (todayMemories.length > 0) {
+            const mem = todayMemories[0]
+            const date = new Date(mem.created_at).toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' })
+            const card = document.createElement('div')
+            card.className = 'today-memory-card'
+            card.innerHTML = `
+                <div class="today-memory-badge">⏳ خاطره‌ی امروز — ${new Date().toLocaleDateString('fa-IR', { month: 'long', day: 'numeric' })}</div>
+                <img src="${mem.image_url}" alt="خاطره امروز">
+                <div class="today-memory-overlay">
+                    <div class="today-memory-info">
+                        <span class="today-memory-user">${mem.user_name} · ${date}</span>
+                        ${mem.caption ? `<p class="today-memory-caption">${mem.caption}</p>` : ''}
+                    </div>
+                    <button class="memory-view-btn" onclick="event.stopPropagation();window.viewMemory('${mem.image_url}', '${mem.user_name}', '${(mem.caption||'').replace(/'/g,"\\'")}', '${date}')">🔍</button>
+                </div>`
+            card.addEventListener('click', () => {
+                window.viewMemory(mem.image_url, mem.user_name, mem.caption || '', date)
+            })
+            memoriesGrid.appendChild(card)
+        }
         
         data.forEach(mem => {
             const date = new Date(mem.created_at).toLocaleDateString('fa-IR', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -135,6 +169,55 @@ export function initMemories(user) {
                 </div>
             `
             memoriesGrid.appendChild(card)
+
+            // انتقال عکس‌های قدیمی (Base64 داخل دیتابیس) به Storage
+            if (String(mem.image_url).startsWith('data:')) {
+                migrateMemoryToStorage(mem.id, mem.image_url, card.querySelector('img'))
+            }
         })
+    }
+
+    // ============ انتقال خاطرات قدیمی از دیتابیس به Storage ============
+    async function migrateMemoryToStorage(id, dataUrl, imgEl) {
+        if (migratingIds.has(id)) return
+        migratingIds.add(id)
+        try {
+            const blob = await (await fetch(dataUrl)).blob()
+            if (!blob || blob.size === 0) return
+            const mime = blob.type || 'image/jpeg'
+            const ext = (mime.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+            const path = `mem_${id}_${Date.now()}.${ext}`
+            const { error } = await supabase.storage.from('memories').upload(path, blob)
+            if (error) return
+            const { data: urlData } = supabase.storage.from('memories').getPublicUrl(path)
+            await supabase.from('memories').update({ image_url: urlData.publicUrl }).eq('id', id)
+            if (imgEl) imgEl.src = urlData.publicUrl
+        } catch (e) { }
+    }
+
+    function isSameMonthDay(dateStr, now) {
+        const d = new Date(dateStr)
+        if (isNaN(d.getTime())) return false
+        return d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+    }
+
+    function isToday(dateStr) {
+        const d = new Date(dateStr)
+        const now = new Date()
+        return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate()
+    }
+
+    // یک‌بار در روز، یادآوری خاطره امروز
+    function setupTodayMemoryToast() {
+        const key = 'yey-today-memory-' + new Date().toLocaleDateString('fa-IR')
+        if (localStorage.getItem(key)) return
+        setTimeout(async () => {
+            const { data } = await supabase.from('memories').select('*').limit(100)
+            const found = (data || []).find(m => isSameMonthDay(m.created_at, new Date()) && !isToday(m.created_at))
+            if (found) {
+                window.showToast('⏳ خاطره‌ی امروز: عکسی از پارسال همین روز داریم!', 'info', 6000)
+                localStorage.setItem(key, '1')
+            }
+        }, 5000)
     }
 }

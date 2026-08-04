@@ -1,5 +1,9 @@
 const ALLOWED_USERS = ['مهدی', 'صادق', 'آرزو', 'دنیز']
 const ADMIN_NAME = 'مهدی'
+// کد ورود ادمین (می‌تونی اینو عوض کنی)
+const ADMIN_CODE = '696'
+// دکمه تغییر کد: بعد از ورود ادمین، از تنظیمات می‌تونی کد جدید بذاری
+const ADMIN_CODE_STORAGE_KEY = 'yey-admin-code'
 
 const USERS_DATABASE = {
     'مهدی': {
@@ -32,4 +36,4 @@ const USERS_DATABASE = {
     }
 }
 
-export { ALLOWED_USERS, ADMIN_NAME, USERS_DATABASE }
+export { ALLOWED_USERS, ADMIN_NAME, ADMIN_CODE, ADMIN_CODE_STORAGE_KEY, USERS_DATABASE }

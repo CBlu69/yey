@@ -236,7 +236,18 @@ window.initExpensesTab = function (user) {
         if (!cu) return
         const ok = await window.showConfirm(`${amount.toLocaleString()} تومان به ${to}؟`, 'تسویه')
         if (!ok) return
-        await supabase.from('settlements').insert([{ expense_id: id, from_user: cu.name, from_user_avatar: cu.avatar || '👤', to_user: to, amount, created_at: new Date().toISOString() }])
+        const payload = {
+            expense_id: id, from_user: cu.name, from_user_avatar: cu.avatar || '👤',
+            to_user: to, amount, created_at: new Date().toISOString()
+        }
+        // ستون‌های جدید (برای نوتیفیکیشن تسویه) — اگر نبود با خطا دوباره بدون اون‌ها
+        const toInfo = USERS_DATABASE[to]
+        const withIds = { ...payload, from_user_id: String(cu.id), to_user_id: toInfo ? String(toInfo.id) : null }
+        let { error } = await supabase.from('settlements').insert([withIds])
+        if (error && String(error.message || '').includes('from_user_id')) {
+            ;({ error } = await supabase.from('settlements').insert([payload]))
+        }
+        if (error) return window.showToast('خطا در تسویه', 'error')
         window.showToast('✅ تسویه شد', 'success')
         loadAllData()
     }

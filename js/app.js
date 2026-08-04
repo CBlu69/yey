@@ -5,6 +5,9 @@ import { initMap } from './map.js'
 import { initGames } from './games.js'
 import { initExpenses } from './expenses.js'
 import { initMemories } from './memories.js'
+import { initPresence } from './presence.js'
+import { initNotifications } from './notifications.js'
+import { initCalendar } from './calendar.js'
 
 let currentUser = null
 
@@ -314,6 +317,9 @@ function initAllModules(user) {
         initMap(user)
         initGames(user)
         initMemories(user)
+        initPresence()
+        initNotifications()
+        initCalendar()
         setupThemePicker()
         setupTiltEffects()
 

@@ -75,9 +75,9 @@ export function initChat(user) {
     loadGroupChat()
     setupGroupSelector()
     setupVoiceRecorder()
-    setupPollButton()
     setupAttachButton()
     setupTypingIndicator()
+    setupChatFileInput()
 
     if (messagesWrapper && scrollBtn) {
         messagesWrapper.addEventListener('scroll', () => {
@@ -446,7 +446,6 @@ export function initChat(user) {
             .select('*')
             .eq('message_id', msgId)
 
-        console.log('🔍 ری‌اکشن‌ها برای', msgId, ':', data) // 👈 ببین چندتا میاد
 
         if (!data || data.length === 0) {
             reactionsDiv.innerHTML = ''
@@ -896,6 +895,7 @@ export function initChat(user) {
         const menu = document.createElement('div')
         menu.className = 'message-menu attach-menu'
         menu.innerHTML = `
+            <div class="menu-item" data-action="file">📁 <span>عکس / فایل</span></div>
             <div class="menu-item" data-action="poll">📊 <span>نظرسنجی</span></div>
             <div class="menu-item" data-action="location">📍 <span>اشتراک موقعیت</span></div>
             <div class="menu-item" data-action="memory">🖼️ <span>خاطره جدید</span></div>
@@ -912,15 +912,303 @@ export function initChat(user) {
             item.addEventListener('click', () => {
                 const action = item.dataset.action
                 menu.remove()
-                if (action === 'poll') openPollCreator()
-                else if (action === 'location') {
-                    document.querySelector('.nav-item[data-tab="map"]')?.click()
-                    window.showToast('📍 موقعیتت رو به اشتراک بذار', 'success')
-                } else if (action === 'memory') {
+                if (action === 'file') {
+                    const input = document.getElementById('chat-file-input')
+                    if (input) input.click()
+                } else if (action === 'poll') openPollCreator()
+                else if (action === 'location') window.openLocationPicker()
+                else if (action === 'memory') {
                     document.querySelector('.nav-item[data-tab="memories"]')?.click()
                 }
             })
         })
+    }
+
+    // ==================== ارسال عکس / فایل ====================
+    function setupChatFileInput() {
+        const input = document.getElementById('chat-file-input')
+        if (!input) return
+        input.addEventListener('change', async () => {
+            const files = Array.from(input.files || [])
+            input.value = ''
+            if (files.length === 0) return
+            for (const file of files) {
+                await uploadAndSendAttachment(file)
+            }
+        })
+    }
+
+    async function uploadAndSendAttachment(file) {
+        const cu = getCurrentUser()
+        if (!cu) return
+
+        // بررسی وجود ستون‌های پیوست در دیتابیس
+        const cols = await checkMsgSchema()
+        if (!cols.attachment) {
+            window.showToast('⚠️ برای ارسال فایل، اسکریپت sql/setup-all.sql را اجرا کن', 'error', 5000)
+            return
+        }
+
+        const ext = (file.name.split('.').pop() || 'bin').toLowerCase()
+        const path = `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.${ext}`
+        window.showToast(`در حال ارسال ${file.name}...`, 'info')
+        let { error } = await supabase.storage.from('chat-files').upload(path, file)
+        if (error) {
+            window.showToast('⚠️ باکت chat-files ساخته نشده؛ sql/setup-all.sql را اجرا کن', 'error', 5000)
+            console.error('upload err:', error)
+            return
+        }
+        const { data: urlData } = supabase.storage.from('chat-files').getPublicUrl(path)
+        const msg = {
+            content: '',
+            user_id: String(cu.id),
+            user_name: cu.name,
+            user_avatar: cu.avatar || '👤',
+            user_color: cu.color || '#d4a017',
+            chat_type: currentChatType,
+            attachment_url: urlData.publicUrl,
+            attachment_type: file.type || (isImageExt(ext) ? 'image/' + ext : 'application/octet-stream'),
+            attachment_name: file.name,
+            reply_to: replyingTo
+        }
+        if (currentChatType === 'group') msg.group_id = currentGroupId
+        else msg.receiver_id = currentReceiverId
+        const { error: insErr } = await supabase.from('messages').insert([msg])
+        if (insErr) {
+            window.showToast('خطا در ارسال فایل', 'error')
+            await supabase.storage.from('chat-files').remove([path])
+            return
+        }
+        cancelReply()
+        window.showToast('فایل ارسال شد ✅', 'success')
+    }
+
+    function isImageExt(ext) {
+        return ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif', 'heic'].includes(ext.toLowerCase())
+    }
+
+    // ============ بررسی ستون‌های جدید جدول پیام‌ها ============
+    let msgSchema = { checked: false, attachment: false, location: false }
+    async function checkMsgSchema() {
+        if (msgSchema.checked) return msgSchema
+        try {
+            const a = await supabase.from('messages').select('attachment_url').limit(0)
+            const l = await supabase.from('messages').select('location_lat').limit(0)
+            msgSchema = {
+                checked: true,
+                attachment: !a.error,
+                location: !l.error
+            }
+        } catch (e) {
+            msgSchema = { checked: true, attachment: false, location: false }
+        }
+        return msgSchema
+    }
+
+    // ==================== ارسال موقعیت ====================
+    window.openLocationPicker = function () {
+        const cu = getCurrentUser()
+        if (!cu) return
+
+        const overlay = document.createElement('div')
+        overlay.className = 'modal-overlay'
+        overlay.innerHTML = `
+            <div class="custom-modal" style="max-width:460px;">
+                <span class="modal-icon">📍</span>
+                <div class="modal-title">ارسال موقعیت</div>
+                <div class="modal-message">مکان‌ت رو روی نقشه انتخاب کن</div>
+                <div id="location-pick-map" style="height:260px;border-radius:14px;overflow:hidden;margin-bottom:12px;direction:ltr;"></div>
+                <div class="modal-buttons">
+                    <button class="modal-btn primary" id="loc-send-btn">📮 ارسال موقعیت</button>
+                    <button class="modal-btn cancel" id="loc-cancel-btn">لغو</button>
+                </div>
+            </div>`
+        document.body.appendChild(overlay)
+
+        const closeModal = () => overlay.remove()
+        overlay.querySelector('#loc-cancel-btn').addEventListener('click', closeModal)
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) closeModal() })
+
+        let picked = null
+        let map = null
+        let marker = null
+
+        // نقشه لیتفال
+        if (window.L) {
+            map = L.map('location-pick-map').setView([35.7483, 51.8237], 15)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 18 }).addTo(map)
+            map.on('click', (e) => {
+                picked = { lat: e.latlng.lat, lng: e.latlng.lng }
+                if (marker) marker.setLatLng(e.latlng)
+                else marker = L.marker(e.latlng).addTo(map)
+            })
+        }
+
+        // موقعیت فعلی کاربر
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition((pos) => {
+                const ll = { lat: pos.coords.latitude, lng: pos.coords.longitude }
+                picked = ll
+                if (map) {
+                    map.setView([ll.lat, ll.lng], 15)
+                    if (marker) marker.setLatLng(ll)
+                    else marker = L.marker(ll).addTo(map)
+                }
+            }, () => { }, { timeout: 8000 })
+        }
+
+        overlay.querySelector('#loc-send-btn').addEventListener('click', async () => {
+            if (!picked) { window.showToast('روی نقشه کلیک کن', 'warning'); return }
+
+            const cols = await checkMsgSchema()
+            if (!cols.location) {
+                window.showToast('⚠️ برای موقعیت، اسکریپت sql/setup-all.sql را اجرا کن', 'error', 5000)
+                return
+            }
+
+            const msg = {
+                content: '📍 موقعیت مکانی',
+                user_id: String(cu.id),
+                user_name: cu.name,
+                user_avatar: cu.avatar || '👤',
+                user_color: cu.color || '#d4a017',
+                chat_type: currentChatType,
+                location_lat: picked.lat,
+                location_lng: picked.lng,
+                reply_to: replyingTo
+            }
+            if (currentChatType === 'group') msg.group_id = currentGroupId
+            else msg.receiver_id = currentReceiverId
+            const { error } = await supabase.from('messages').insert([msg])
+            if (error) { window.showToast('خطا در ارسال موقعیت', 'error'); return }
+            cancelReply()
+            closeModal()
+            window.showToast('موقعیت ارسال شد 📍', 'success')
+        })
+    }
+
+    window.openChatLocation = function (lat, lng) {
+        window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank')
+    }
+
+    window.viewChatImage = function (url) {
+        const old = document.getElementById('fullscreen-chat-image')
+        if (old) old.remove()
+        const overlay = document.createElement('div')
+        overlay.id = 'fullscreen-chat-image'
+        overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.96);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;'
+        overlay.innerHTML = `
+            <button style="position:absolute;top:16px;right:16px;width:42px;height:42px;border-radius:50%;border:none;background:rgba(255,255,255,0.15);color:#fff;font-size:18px;cursor:pointer;" onclick="this.closest('#fullscreen-chat-image').remove()">✕</button>
+            <img src="${url}" style="max-width:95%;max-height:92%;object-fit:contain;border-radius:8px;">
+        `
+        document.body.appendChild(overlay)
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
+    }
+
+    // ==================== جستجو در پیام‌ها ====================
+    window.openChatSearch = function () {
+        const cu = getCurrentUser()
+        if (!cu) return
+
+        const overlay = document.createElement('div')
+        overlay.className = 'modal-overlay'
+        overlay.innerHTML = `
+            <div class="custom-modal" style="max-width:520px;width:92vw;max-height:85vh;display:flex;flex-direction:column;">
+                <span class="modal-icon">🔍</span>
+                <div class="modal-title">جستجو در پیام‌ها</div>
+                <input type="text" id="chat-search-input" class="prompt-input" placeholder="کلمه‌ای بنویس..." autofocus style="margin-bottom:12px;">
+                <div id="chat-search-results" style="flex:1;overflow-y:auto;text-align:right;min-height:120px;"></div>
+                <div class="modal-buttons">
+                    <button class="modal-btn primary" id="chat-search-btn">جستجو</button>
+                    <button class="modal-btn cancel" id="chat-search-close">بستن</button>
+                </div>
+            </div>`
+        document.body.appendChild(overlay)
+
+        const input = overlay.querySelector('#chat-search-input')
+        const results = overlay.querySelector('#chat-search-results')
+        results.innerHTML = '<div style="color:var(--text-tertiary);padding:20px;text-align:center;">برای جستجو در کل پیام‌ها، کلمه رو بنویس 🔎</div>'
+
+        const doSearch = async () => {
+            const q = input.value.trim()
+            if (!q) return
+            results.innerHTML = '<div style="color:var(--text-tertiary);padding:20px;text-align:center;">در حال جستجو...</div>'
+            const { data, error } = await supabase
+                .from('messages')
+                .select('*')
+                .ilike('content', '%' + q + '%')
+                .order('created_at', { ascending: false })
+                .limit(30)
+            if (error || !data || data.length === 0) {
+                results.innerHTML = '<div style="color:var(--text-tertiary);padding:20px;text-align:center;">چیزی پیدا نشد 🤷</div>'
+                return
+            }
+            results.innerHTML = data.map(m => {
+                const isGroup = m.chat_type === 'group'
+                const chatName = isGroup ? 'گروه' : (m.user_id === String(cu.id) ? 'چت خصوصی' : 'چت خصوصی')
+                const time = new Date(m.created_at).toLocaleDateString('fa-IR', { month: 'long', day: 'numeric' }) +
+                    ' ' + new Date(m.created_at).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' })
+                const preview = (m.content || (m.attachment_type ? '📎 ' + (m.attachment_name || 'فایل') : '')).substring(0, 60)
+                return `
+                    <div class="chat-search-item" data-msgid="${m.id}" data-group="${isGroup ? m.group_id : ''}" data-user="${isGroup ? '' : (m.user_id === String(cu.id) ? m.receiver_id : m.user_id)}">
+                        <div class="chat-search-sender">${m.user_name || 'ناشناس'} · ${time}</div>
+                        <div class="chat-search-preview">${escapeHtml(preview)}</div>
+                    </div>`
+            }).join('')
+
+            results.querySelectorAll('.chat-search-item').forEach(item => {
+                item.addEventListener('click', async () => {
+                    const groupId = item.dataset.group
+                    const userId = item.dataset.user
+                    const msgId = item.dataset.msgid
+                    overlay.remove()
+                    // برو به چت مربوطه
+                    if (groupId) {
+                        const { data: g } = await supabase.from('chat_groups').select('*').eq('id', groupId).single()
+                        if (g) {
+                            window.switchToGroup(groupId, g.name)
+                            document.querySelector('.nav-item[data-tab="chat"]')?.click()
+                        }
+                    } else if (userId) {
+                        const { data: u } = await supabase.from('messages').select('*').eq('id', msgId).single()
+                        const name = u ? (String(u.receiver_id) === String(cu.id) ? u.user_name : '') : ''
+                        const other = userId
+                        const info = Object.values(USERS_DATABASE).find(x => String(x.id) === String(other))
+                        if (info) {
+                            window.switchToPrivateChat(info.id, info.name)
+                            document.querySelector('.nav-item[data-tab="chat"]')?.click()
+                        }
+                    }
+                    // اسکرول به پیام
+                    setTimeout(() => {
+                        const el = document.getElementById(`msg-${msgId}`)
+                        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        else {
+                            // پیام در cache نیست؛ یک نمایش سریع
+                            const { data: m } = supabase.from('messages').select('*').eq('id', msgId).single()
+                            m.then(r => {
+                                if (r.data) {
+                                    displayMessage(r.data)
+                                    const el2 = document.getElementById(`msg-${msgId}`)
+                                    if (el2) el2.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                                }
+                            })
+                        }
+                    }, 700)
+                })
+            })
+        }
+
+        overlay.querySelector('#chat-search-btn').addEventListener('click', doSearch)
+        input.addEventListener('keydown', (e) => { if (e.key === 'Enter') doSearch() })
+        overlay.querySelector('#chat-search-close').addEventListener('click', () => overlay.remove())
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
+    }
+
+    function escapeHtml(str) {
+        const div = document.createElement('div')
+        div.textContent = str
+        return div.innerHTML
     }
 
     async function displayPoll(poll) {
@@ -1109,9 +1397,36 @@ export function initChat(user) {
             </div>`
         }
 
+        let attachHTML = ''
+        if (msg.attachment_url) {
+            if (String(msg.attachment_type || '').startsWith('image/')) {
+                attachHTML = `<div class="msg-attachment"><img src="${msg.attachment_url}" class="msg-image" alt="${msg.attachment_name || 'عکس'}" onclick="window.viewChatImage('${msg.attachment_url}')"></div>`
+            } else {
+                attachHTML = `<a class="msg-file" href="${msg.attachment_url}" target="_blank" rel="noopener">
+                    <span class="msg-file-icon">${fileEmoji(msg.attachment_type, msg.attachment_name)}</span>
+                    <span class="msg-file-name">${msg.attachment_name || 'فایل'}</span>
+                    <span class="msg-file-dl">⬇</span>
+                </a>`
+            }
+        }
+
+        let locationHTML = ''
+        if (msg.location_lat != null && msg.location_lng != null) {
+            locationHTML = `<div class="msg-location" onclick="window.openChatLocation(${msg.location_lat},${msg.location_lng})">
+                <span class="msg-location-icon">📍</span>
+                <div class="msg-location-body">
+                    <div class="msg-location-title">موقعیت مکانی</div>
+                    <div class="msg-location-coords">${Number(msg.location_lat).toFixed(5)}, ${Number(msg.location_lng).toFixed(5)}</div>
+                </div>
+                <span class="msg-location-open">🗺️</span>
+            </div>`
+        }
+
         div.innerHTML = `
             <div class="sender">${getAvatarHTML(msg.user_avatar)} ${msg.user_name || 'ناشناس'}</div>
             ${replyHTML}
+            ${attachHTML}
+            ${locationHTML}
             <div class="msg-content"></div>
             <div class="time">${time}${msg.edited ? ' <span class="edited-tag">ویرایش شده</span>' : ''}</div>
         `
@@ -1119,6 +1434,20 @@ export function initChat(user) {
         messagesContainer.appendChild(div)
 
         refreshReactions(msg.id)
+    }
+
+    function fileEmoji(type, name) {
+        const n = (name || '').toLowerCase()
+        if (n.includes('.pdf')) return '📄'
+        if (n.includes('.zip') || n.includes('.rar')) return '🗜️'
+        if (n.includes('.mp3') || n.includes('.wav') || n.includes('.m4a')) return '🎵'
+        if (n.includes('.mp4') || n.includes('.mkv') || n.includes('.mov')) return '🎬'
+        if (n.includes('.doc') || n.includes('.docx')) return '📝'
+        if (n.includes('.xls') || n.includes('.xlsx')) return '📊'
+        if (n.includes('.ppt') || n.includes('.pptx')) return '📽️'
+        if (String(type || '').includes('audio')) return '🎵'
+        if (String(type || '').includes('video')) return '🎬'
+        return '📁'
     }
 
     // ==================== حذف و ویرایش ====================
@@ -1324,6 +1653,7 @@ export function initChat(user) {
             return `<button class="chat-tab" data-user="${info.id}" onclick="window.switchToPrivateChat('${info.id}', '${name}'); document.querySelectorAll('.chat-tab').forEach(b=>b.classList.remove('active')); this.classList.add('active');">${getAvatarHTML(info.avatar, 20)} ${name}</button>`
         }).join('')}
                 ${admin ? `<button class="chat-tab admin-tab" onclick="window.showCreateGroupModal()" title="ساخت گروه جدید">➕</button>` : ''}
+                <button class="chat-tab" onclick="window.showMembers()" title="اعضا و حضور">👥 اعضا</button>
             </div>`
         const headerEl = document.querySelector('.chat-header')
         if (headerEl) headerEl.after(selector)

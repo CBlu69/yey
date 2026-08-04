@@ -1,4 +1,4 @@
-import { ALLOWED_USERS, ADMIN_NAME, USERS_DATABASE } from './config.js'
+import { ALLOWED_USERS, ADMIN_NAME, ADMIN_CODE, ADMIN_CODE_STORAGE_KEY, USERS_DATABASE } from './config.js'
 
 let currentUser = null
 
@@ -87,6 +87,29 @@ function setupTypeLogin() {
             }
 
             return
+        }
+
+        // ===== ادمین: کد ورود =====
+        if (name === ADMIN_NAME) {
+            const storedCode = localStorage.getItem(ADMIN_CODE_STORAGE_KEY) || ADMIN_CODE
+            if (typeof window.showPrompt === 'function') {
+                const entered = await window.showPrompt('🔐 کد ورود ادمین؟')
+                if (entered !== storedCode || entered === null) {
+                    if (messageBox) {
+                        messageBox.textContent = '❌ کد ورود اشتباهه'
+                        messageBox.className = 'login-message error'
+                        messageBox.style.display = 'block'
+                    }
+                    if (container) {
+                        container.classList.add('shake')
+                        setTimeout(() => container.classList.remove('shake'), 500)
+                    }
+                    if (input) {
+                        setTimeout(() => { input.value = ''; input.focus() }, 600)
+                    }
+                    return
+                }
+            }
         }
 
         const userInfo = USERS_DATABASE[name] || {

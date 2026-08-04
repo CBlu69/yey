@@ -56,6 +56,10 @@
             <button class="nav-item" data-tab="memories">
                 <span class="icon"><img src="assets/icons/gallery.png" alt="خاطرات"></span><span>خاطرات</span>
             </button>
+            <button class="nav-item" data-tab="calendar">
+                <span class="icon"><img src="assets/icons/calendar-nav.png" alt="تقویم"></span>
+                <span>تقویم</span>
+            </button>
         </nav>
 
         <div class="tab-content">
@@ -66,6 +70,8 @@
                     <div class="chat-header">
                         <h2><img src="assets/icons/chat.png" class="header-icon"> گفتگوی گروهی</h2>
                         <div class="header-actions">
+                            <button id="search-btn" class="logout-btn" title="جستجو در پیام‌ها"
+                                onclick="window.openChatSearch()">🔍</button>
                             <button id="theme-btn" class="logout-btn" title="تم رنگی">🎨</button>
                             <button id="install-btn" class="install-pwa-btn" style="display:none;"
                                 onclick="installPWA()">
@@ -99,17 +105,15 @@
                                 <img src="assets/icons/mic.png" alt="ویس"
                                     style="width:20px;height:20px;object-fit:contain;">
                             </button>
-                            <button type="button" id="poll-btn" title="نظرسنجی">
-                                <img src="assets/icons/poll.png" alt="نظرسنجی"
-                                    style="width:18px;height:18px;object-fit:contain;">
-                            </button>
                             <button type="submit">
                                 <img src="assets/icons/send.png" alt="ارسال"
                                     style="width:20px;height:20px;object-fit:contain;">
                             </button>
                         </form>
+                        <input type="file" id="chat-file-input" multiple hidden>
                         <div id="voice-recording-bar" class="voice-recording-bar" style="display:none;">
-                            <button type="button" id="voice-cancel-btn" class="voice-cancel-btn" title="لغو ضبط">✕</button>
+                            <button type="button" id="voice-cancel-btn" class="voice-cancel-btn"
+                                title="لغو ضبط">✕</button>
                             <div class="voice-rec-status">
                                 <span class="voice-rec-dot"></span>
                                 <span id="voice-timer">0:00</span>
@@ -192,6 +196,30 @@
                     <div id="memories-grid" class="memories-grid"></div>
                 </div>
             </div>
+
+            <!-- تقویم -->
+            <div id="tab-calendar" class="tab-pane">
+                <div class="calendar-container">
+                    <h2 class="tab-title">
+                        <img src="assets/icons/calendar-nav.png" class="header-icon"> تقویم گروهی
+                    </h2>
+                    <div class="calendar-card">
+                        <div class="cal-toolbar">
+                            <button class="cal-nav-btn" onclick="window.calNavMonth(-1)" title="ماه قبل">▶</button>
+                            <span id="calendar-month-label" class="cal-month-label"></span>
+                            <button class="cal-nav-btn" onclick="window.calNavMonth(1)" title="ماه بعد">◀</button>
+                        </div>
+                        <div id="calendar-grid" class="calendar-grid"></div>
+                    </div>
+                    <div class="calendar-list-header">
+                        <h3>
+                            <img src="assets/icons/events-list.png" class="header-icon"> رویدادهای روز
+                        </h3> 
+                        <button id="add-calendar-event-btn" class="upload-btn">➕ رویداد جدید</button>
+                    </div>
+                    <div id="calendar-events-list" class="calendar-events-list"></div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -203,7 +231,30 @@
     <script>
         let deferredPrompt = null
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').then(r => console.log('✅ SW')).catch(() => { }))
+            // به‌روزرسانی خودکار: اگر نسخه جدید سرویس‌ورکر نصب شد، صفحه رفرش شود
+            let refreshing = false
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                if (refreshing) return
+                refreshing = true
+                location.reload()
+            })
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('sw.js').then(reg => {
+                    console.log('✅ SW')
+                    // هر ۱۵ دقیقه بررسی نسخه جدید
+                    setInterval(() => { reg.update().catch(() => { }) }, 15 * 60 * 1000)
+                    reg.addEventListener('updatefound', () => {
+                        const newSW = reg.installing
+                        if (!newSW) return
+                        newSW.addEventListener('statechange', () => {
+                            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                                console.log('🆕 نسخه جدید پیدا شد')
+                                newSW.postMessage({ type: 'SKIP_WAITING' })
+                            }
+                        })
+                    })
+                }).catch(() => { })
+            })
         }
         window.addEventListener('beforeinstallprompt', (e) => {
             e.preventDefault(); deferredPrompt = e
