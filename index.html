@@ -83,10 +83,23 @@
                             onclick="document.getElementById('chat-messages-wrapper').scrollTo({top:document.getElementById('chat-messages-wrapper').scrollHeight,behavior:'smooth'})">⬇</button>
                     </div>
                     <div class="chat-input-fixed">
+                        <div id="reply-preview-container"></div>
                         <form id="chat-form" class="chat-input">
+                            <button type="button" id="voice-record-btn" class="voice-record-btn"
+                                title="نگه دار برای ضبط ویس">
+                                <img src="assets/icons/mic.png" alt="ویس"
+                                    style="width:20px;height:20px;object-fit:contain;">
+                            </button>
+                            <span id="voice-timer" class="voice-timer" style="display:none;">0s</span>
                             <input type="text" id="message-input" placeholder="پیامت رو بنویس..." autocomplete="off">
-                            <button type="submit"><img src="assets/icons/send.png" alt="ارسال"
-                                    style="width:20px;height:20px;object-fit:contain;"></button>
+                            <button type="button" id="poll-btn" title="نظرسنجی">
+                                <img src="assets/icons/poll.png" alt="نظرسنجی"
+                                    style="width:18px;height:18px;object-fit:contain;">
+                            </button>
+                            <button type="submit">
+                                <img src="assets/icons/send.png" alt="ارسال"
+                                    style="width:20px;height:20px;object-fit:contain;">
+                            </button>
                         </form>
                     </div>
                 </div>
@@ -107,9 +120,19 @@
                 <h2 class="tab-title"><img src="assets/icons/game.png" class="header-icon"> بازی‌های گروهی</h2>
                 <div class="games-grid">
                     <div class="game-card" data-game="bottle">
-                        <span>🍾</span>
+                        <span class="game-icon">🍾</span>
                         <h3>چرخوندن بطری</h3>
                         <p>بچرخون ببین کی انتخاب میشه!</p>
+                    </div>
+                    <div class="game-card" data-game="truth-dare">
+                        <span class="game-icon">🔥</span>
+                        <h3>حقیقت یا جرأت</h3>
+                        <p>جرأت می‌کنی حقیقت رو بگی؟</p>
+                    </div>
+                    <div class="game-card" data-game="spy">
+                        <span class="game-icon">🕵️</span>
+                        <h3>اسپای</h3>
+                        <p>جاسوس رو پیدا کن!</p>
                     </div>
                 </div>
             </div>
