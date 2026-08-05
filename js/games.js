@@ -134,7 +134,7 @@ function openBottleGame(players) {
         isSpinning = true
         const randomIndex = Math.floor(Math.random() * players.length)
         const selected = players[randomIndex]
-        const totalRotation = (5 * 360) + (360 - (randomIndex / players.length) * 360) + Math.floor(Math.random() * 30)
+        const totalRotation = (5 * 360) + (randomIndex / players.length) * 360 + Math.floor(Math.random() * 30)
 
         bottle.style.transition = 'transform 3s cubic-bezier(0.17, 0.67, 0.12, 0.99)'
         bottle.style.transform = `rotate(${totalRotation}deg)`

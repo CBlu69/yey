@@ -1,7 +1,7 @@
 // sw.js — کش هوشمند: هر تغییر در فایل‌ها → نسخه جدید
 // ⚠️ بعد از هر تغییر، CACHE_NAME و CACHE_BUST را عوض کن تا همه نسخه جدید بگیرند
-const CACHE_NAME = 'yey-v6'
-const CACHE_BUST = '20260804b'
+const CACHE_NAME = 'yey-v10'
+const CACHE_BUST = '20260806d'
 
 const coreFiles = [
     '/',

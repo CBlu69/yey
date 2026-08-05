@@ -72,8 +72,7 @@ export function initMemories(user) {
         overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:#000;z-index:99999;display:flex;flex-direction:column;align-items:center;justify-content:center;'
         
         overlay.innerHTML = `
-            <div style="position:absolute;top:15px;right:15px;display:flex;gap:10px;z-index:10;">
-                <button id="btn-download" style="padding:10px 20px;background:#6C5CE7;color:#fff;border:none;border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;">📥 دانلود</button>
+            <div style="position:absolute;top:15px;right:15px;z-index:10;">
                 <button id="btn-close" style="width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,0.2);color:#fff;font-size:20px;cursor:pointer;">✕</button>
             </div>
             <img src="${url}" style="max-width:95%;max-height:80%;object-fit:contain;">
@@ -86,21 +85,6 @@ export function initMemories(user) {
         document.body.appendChild(overlay)
         
         document.getElementById('btn-close').onclick = function() { overlay.remove() }
-        
-        document.getElementById('btn-download').onclick = function() {
-            fetch(url).then(r => r.blob()).then(b => {
-                const a = document.createElement('a')
-                a.href = URL.createObjectURL(b)
-                a.download = 'memory.jpg'
-                a.click()
-            }).catch(() => {
-                const a = document.createElement('a')
-                a.href = url
-                a.download = 'memory.jpg'
-                a.target = '_blank'
-                a.click()
-            })
-        }
         
         overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove() })
         

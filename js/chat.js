@@ -2,6 +2,7 @@
 import { supabase } from './supabase.js'
 import { getCurrentUser, isAdmin } from './auth.js'
 import { ALLOWED_USERS, USERS_DATABASE } from './config.js'
+import { isOnline } from './presence.js'
 
 let currentChatType = 'group'
 let currentGroupId = null
@@ -52,6 +53,37 @@ export function initChat(user) {
     if (!messagesContainer || !chatForm || !messageInput) return
 
     let editingMessageId = null
+    const readMarkedIds = new Set()
+
+    // ==================== آنلاین/آفلاین ====================
+    function updateOnlineBadges() {
+        // نقطه سبز روی تب‌های چت خصوصی
+        document.querySelectorAll('.chat-tab[data-user]').forEach(tab => {
+            const uid = tab.dataset.user
+            let dot = tab.querySelector('.presence-dot')
+            if (!dot) {
+                dot = document.createElement('span')
+                dot.className = 'presence-dot'
+                tab.appendChild(dot)
+            }
+            const on = isOnline(uid)
+            dot.classList.toggle('online', on)
+            dot.classList.toggle('offline', !on)
+            dot.title = on ? 'آنلاین' : 'آفلاین'
+        })
+        // وضعیت هدر چت خصوصی
+        if (currentChatType === 'private' && currentReceiverId) {
+            const st = document.querySelector('.chat-header .online-status')
+            if (st) {
+                const on = isOnline(currentReceiverId)
+                st.className = `online-status ${on ? 'online' : 'offline'}`
+                st.textContent = on ? '🟢' : '⚫'
+                st.title = on ? 'آنلاین' : 'آفلاین'
+            }
+        }
+    }
+
+    window.addEventListener('presence-update', () => updateOnlineBadges())
 
     loadUnreadCounts()
     loadGroupChat()
@@ -221,13 +253,16 @@ export function initChat(user) {
     // ==================== Seen ====================
     async function markAsRead(msgId) {
         const cu = getCurrentUser()
-        if (!cu) return
-        await supabase.from('message_reads').upsert({
-            message_id: msgId,
-            user_id: String(cu.id),
-            user_name: cu.name,
-            read_at: new Date().toISOString()
-        }, { onConflict: 'message_id, user_id' })
+        if (!cu || readMarkedIds.has(msgId)) return
+        readMarkedIds.add(msgId)
+        try {
+            await supabase.from('message_reads').upsert({
+                message_id: msgId,
+                user_id: String(cu.id),
+                user_name: cu.name,
+                read_at: new Date().toISOString()
+            }, { onConflict: 'message_id, user_id' })
+        } catch (e) { }
     }
 
     async function checkIfRead(msgId) {
@@ -510,12 +545,116 @@ export function initChat(user) {
     async function checkMsgSchema() { if (msgSchema.checked) return msgSchema; try { const a = await supabase.from('messages').select('attachment_url').limit(0); const l = await supabase.from('messages').select('location_lat').limit(0); msgSchema = { checked: true, attachment: !a.error, location: !l.error } } catch (e) { msgSchema = { checked: true, attachment: false, location: false } }; return msgSchema }
 
     // ==================== ارسال موقعیت ====================
-    window.openLocationPicker = function () { /* ... بدون تغییر ... */ }
+    window.openLocationPicker = async function () {
+        if (!('geolocation' in navigator)) { window.showToast('موقعیت روی این دستگاه نیست', 'error'); return }
+        window.showToast('در حال گرفتن موقعیت...', 'info')
+        try {
+            const pos = await new Promise((resolve, reject) => navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true, timeout: 12000 }))
+            const lat = pos.coords.latitude, lng = pos.coords.longitude
+            const cols = await checkMsgSchema()
+            if (!cols.location) { window.showToast('⚠️ ستون موقعیت ساخته نشده؛ sql/setup-all.sql را اجرا کن', 'error', 5000); return }
+            const cu = getCurrentUser()
+            if (!cu) return
+            const msg = {
+                content: '', user_id: String(cu.id), user_name: cu.name, user_avatar: cu.avatar || '👤',
+                user_color: cu.color || '#d4a017', chat_type: currentChatType,
+                location_lat: lat, location_lng: lng, reply_to: replyingTo
+            }
+            if (currentChatType === 'group') msg.group_id = currentGroupId
+            else msg.receiver_id = currentReceiverId
+            const { error } = await supabase.from('messages').insert([msg])
+            if (error) { window.showToast('خطا در ارسال موقعیت', 'error'); return }
+            cancelReply()
+            window.showToast('📍 موقعیت ارسال شد', 'success')
+        } catch (err) {
+            window.showToast('موقعیت در دسترس نیست', 'error')
+        }
+    }
     window.openChatLocation = function (lat, lng) { window.open(`https://www.google.com/maps?q=${lat},${lng}`, '_blank') }
     window.viewChatImage = function (url) { const old = document.getElementById('fullscreen-chat-image'); if (old) old.remove(); const overlay = document.createElement('div'); overlay.id = 'fullscreen-chat-image'; overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.96);z-index:99999;display:flex;align-items:center;justify-content:center;flex-direction:column;'; overlay.innerHTML = `<button style="position:absolute;top:16px;right:16px;width:42px;height:42px;border-radius:50%;border:none;background:rgba(255,255,255,0.15);color:#fff;font-size:18px;cursor:pointer;" onclick="this.closest('#fullscreen-chat-image').remove()">✕</button><img src="${url}" style="max-width:95%;max-height:92%;object-fit:contain;border-radius:8px;">`; document.body.appendChild(overlay); overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() }) }
 
     // ==================== جستجو ====================
-    window.openChatSearch = function () { /* ... بدون تغییر ... */ }
+    window.openChatSearch = function () {
+        const overlay = document.createElement('div')
+        overlay.className = 'modal-overlay'
+        overlay.innerHTML = `
+            <div class="custom-modal" style="max-width:520px;">
+                <span class="modal-icon"><img src="assets/icons/search.png" style="width:36px;height:36px;object-fit:contain;"></span>
+                <div class="modal-title">جستجو در پیام‌ها</div>
+                <div class="modal-message">
+                    <input type="search" id="chat-search-input" class="prompt-input" placeholder="دنبال چی می‌گردی؟..." autocomplete="off" style="width:100%;padding:12px 16px;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;color:var(--text-primary);font-size:14px;font-family:inherit;outline:none;text-align:center;">
+                </div>
+                <div id="chat-search-results" style="max-height:52vh;overflow-y:auto;text-align:right;margin-bottom:12px;"></div>
+                <div class="modal-buttons">
+                    <button class="modal-btn cancel" onclick="this.closest('.modal-overlay').remove()">بستن</button>
+                </div>
+            </div>`
+        document.body.appendChild(overlay)
+
+        const input = overlay.querySelector('#chat-search-input')
+        const results = overlay.querySelector('#chat-search-results')
+        input.focus()
+        let timer = null
+        input.addEventListener('input', () => {
+            clearTimeout(timer)
+            const q = input.value.trim()
+            if (!q) { results.innerHTML = '<div style="color:var(--text-tertiary);padding:10px;text-align:center;">یه چیزی بنویس تا بگردم...</div>'; return }
+            timer = setTimeout(() => runChatSearch(q, results, overlay), 350)
+        })
+        overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove() })
+    }
+
+    function escRegExp(str) { return (str || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&') }
+
+    async function runChatSearch(q, results, overlay) {
+        results.innerHTML = '<div style="color:var(--text-tertiary);padding:10px;text-align:center;">در حال جستجو...</div>'
+        try {
+            let query = supabase
+                .from('messages')
+                .select('id, content, user_name, created_at, chat_type, group_id, user_id, receiver_id')
+                .ilike('content', `%${q}%`)
+                .order('created_at', { ascending: false })
+                .limit(60)
+            if (currentChatType === 'group') {
+                query = query.eq('chat_type', 'group').eq('group_id', currentGroupId)
+            } else {
+                const cu = getCurrentUser()
+                query = query.eq('chat_type', 'private').or(`and(user_id.eq.${String(cu.id)},receiver_id.eq.${currentReceiverId}),and(user_id.eq.${currentReceiverId},receiver_id.eq.${String(cu.id)})`)
+            }
+            const { data } = await query
+            if (!data || data.length === 0) {
+                results.innerHTML = '<div style="color:var(--text-tertiary);padding:10px;text-align:center;">چیزی پیدا نشد 🔍</div>'
+                return
+            }
+            const re = new RegExp(escRegExp(q), 'gi')
+            results.innerHTML = data.map(m => {
+                const highlighted = escapeHtml(m.content || '').replace(re, match => `<mark style="background:#ffd166;color:#1a1a2e;border-radius:4px;padding:0 2px;">${match}</mark>`)
+                const time = m.created_at ? new Date(m.created_at).toLocaleTimeString('fa-IR', { hour: '2-digit', minute: '2-digit' }) : ''
+                return `<button class="chat-search-item" data-id="${m.id}" style="width:100%;display:block;text-align:right;background:var(--bg-tertiary);border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:8px;color:var(--text-primary);font-family:inherit;font-size:13px;cursor:pointer;">
+                    <div style="font-weight:600;color:var(--accent);margin-bottom:4px;">${escapeHtml(m.user_name || 'ناشناس')}</div>
+                    <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${highlighted}</div>
+                    <div style="font-size:11px;color:var(--text-tertiary);margin-top:4px;">${time}</div>
+                </button>`
+            }).join('')
+            results.querySelectorAll('.chat-search-item').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    overlay.remove()
+                    const el = document.getElementById(`msg-${btn.dataset.id}`)
+                    if (el) {
+                        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+                        el.style.transition = 'background 0.6s ease'
+                        el.style.background = 'rgba(255,209,102,0.3)'
+                        setTimeout(() => { el.style.background = '' }, 1500)
+                    } else {
+                        window.showToast('این پیام اینجا لود نشده', 'warning')
+                    }
+                })
+            })
+        } catch (e) {
+            results.innerHTML = '<div style="color:var(--red);padding:10px;text-align:center;">جستجو ممکن نشد (اتصال؟)</div>'
+        }
+    }
+
     function escapeHtml(str) { const div = document.createElement('div'); div.textContent = str; return div.innerHTML }
 
     // ==================== نظرسنجی نمایش ====================
@@ -595,7 +734,7 @@ export function initChat(user) {
     // ==================== گروه و چت ====================
     async function loadGroupChat(groupId = null) { currentChatType = 'group'; if (groupId) { currentGroupId = groupId; const { data: group } = await supabase.from('chat_groups').select('*').eq('id', groupId).single(); if (chatHeader && group) chatHeader.innerHTML = `💬 ${group.name}`; clearUnreadFromDB(`group-${groupId}`); loadMessages(); loadPinnedMessage(); return }; let { data: groups } = await supabase.from('chat_groups').select('*').order('created_at', { ascending: true }).limit(1); if (!groups || groups.length === 0) { const cu = getCurrentUser(); const { data: newGroup } = await supabase.from('chat_groups').insert([{ name: 'گروه اصلی', creator_id: cu?.id, creator_name: cu?.name }]).select(); groups = newGroup }; currentGroupId = groups[0].id; currentReceiverId = null; if (chatHeader) chatHeader.innerHTML = `💬 ${groups[0].name}`; clearUnreadFromDB(`group-${currentGroupId}`); loadMessages(); loadPinnedMessage() }
 
-    window.switchToPrivateChat = async (receiverId, receiverName) => { currentChatType = 'private'; currentReceiverId = receiverId; currentGroupId = null; const info = USERS_DATABASE[receiverName] || { avatar: '👤' }; const isOnline = !!onlineUsers[receiverId]; if (chatHeader) chatHeader.innerHTML = `${getAvatarHTML(info.avatar, 24)} ${receiverName} <span class="online-status ${isOnline ? 'online' : 'offline'}">${isOnline ? '🟢' : '⚫'}</span>`; clearUnreadFromDB(`private-${receiverId}`); loadMessages() }
+    window.switchToPrivateChat = async (receiverId, receiverName) => { currentChatType = 'private'; currentReceiverId = receiverId; currentGroupId = null; const info = USERS_DATABASE[receiverName] || { avatar: '👤' }; const isOn = isOnline(receiverId); if (chatHeader) chatHeader.innerHTML = `${getAvatarHTML(info.avatar, 24)} ${receiverName} <span class="online-status ${isOn ? 'online' : 'offline'}">${isOn ? '🟢' : '⚫'}</span>`; clearUnreadFromDB(`private-${receiverId}`); loadMessages() }
 
     window.switchToGroup = (groupId, groupName) => { currentChatType = 'group'; currentGroupId = groupId; currentReceiverId = null; if (chatHeader) chatHeader.innerHTML = `💬 ${groupName}`; document.querySelectorAll('.chat-tab').forEach(b => b.classList.remove('active')); document.querySelector(`.chat-tab[data-group="${groupId}"]`)?.classList.add('active'); clearUnreadFromDB(`group-${groupId}`); loadMessages(); loadPinnedMessage() }
 

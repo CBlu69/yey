@@ -11,6 +11,7 @@ const USERS_DATABASE = {
 }
 
 let realtimeSetup = false
+let documentClickBound = false
 
 export function initExpenses(user) {}
 
@@ -109,12 +110,18 @@ window.initExpensesTab = function (user) {
                 options.querySelectorAll('.payer-option').forEach(o => o.classList.toggle('selected', o === opt))
             })
         })
-        document.addEventListener('click', (e) => {
-            if (!dropdown.contains(e.target)) {
-                dropdown.classList.remove('open')
-                options.style.display = 'none'
-            }
-        })
+        if (!documentClickBound) {
+            documentClickBound = true
+            document.addEventListener('click', (e) => {
+                if (document.querySelector('.payer-select') && !document.querySelector('.payer-select')?.contains(e.target)) {
+                    const openDropdown = document.querySelector('.payer-select.open')
+                    if (openDropdown) {
+                        openDropdown.classList.remove('open')
+                        openDropdown.querySelector('.payer-options').style.display = 'none'
+                    }
+                }
+            })
+        }
 
         if (!participantsContainer) return
         participantsContainer.innerHTML = `
@@ -137,6 +144,12 @@ window.initExpensesTab = function (user) {
         })
     }
 
+    function parseParts(exp) {
+        let p = exp?.participants
+        if (typeof p === 'string') { try { p = JSON.parse(p) } catch (e) { p = null } }
+        return (Array.isArray(p) && p.length > 0) ? p : ALLOWED_USERS
+    }
+
     async function loadAllData() {
         const { data: expenses } = await supabase.from('expenses').select('*').order('created_at', { ascending: false }).limit(100)
         const { data: settlements } = await supabase.from('settlements').select('*')
@@ -151,7 +164,7 @@ window.initExpensesTab = function (user) {
 
         const cu = getCurrentUser()
         expenses.forEach(exp => {
-            const parts = exp.participants || ALLOWED_USERS
+            const parts = parseParts(exp)
             const pp = Math.floor(exp.amount / parts.length)
             const isPayer = exp.paid_by === cu?.name
             const sett = (settlements || []).filter(s => s.expense_id === exp.id)
@@ -204,7 +217,7 @@ window.initExpensesTab = function (user) {
             const bal = {}
             ALLOWED_USERS.forEach(n => bal[n] = 0)
             expenses.forEach(exp => {
-                const parts = exp.participants || ALLOWED_USERS
+                const parts = parseParts(exp)
                 const pp = Math.floor(exp.amount / parts.length)
                 parts.forEach(name => { bal[name] = (bal[name] || 0) + (name === exp.paid_by ? exp.amount - pp : -pp) })
             })
@@ -253,6 +266,7 @@ window.initExpensesTab = function (user) {
     }
 
     function getIcon(d) {
+        d = String(d || '')
         if (d.includes('غذا') || d.includes('رستوران')) return '🍽️'
         if (d.includes('کافه') || d.includes('قهوه')) return '☕'
         if (d.includes('پیتزا')) return '🍕'

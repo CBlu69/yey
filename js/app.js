@@ -9,6 +9,36 @@ import { initPresence } from './presence.js'
 import { initNotifications } from './notifications.js'
 import { initCalendar } from './calendar.js'
 
+// ==================== حالت اپ واقعی ====================
+// جلوگیری از راست‌کلیک، انتخاب متن، کپی و کشیدن/ذخیره عکس
+document.addEventListener('contextmenu', (e) => {
+    e.preventDefault()
+})
+
+document.addEventListener('selectstart', (e) => {
+    if (e.target.closest('input, textarea, [contenteditable]')) return
+    e.preventDefault()
+})
+
+document.addEventListener('copy', (e) => {
+    if (e.target.closest('input, textarea, [contenteditable]')) return
+    e.preventDefault()
+})
+
+document.addEventListener('cut', (e) => {
+    if (e.target.closest('input, textarea, [contenteditable]')) return
+    e.preventDefault()
+})
+
+document.addEventListener('dragstart', (e) => {
+    if (e.target instanceof HTMLImageElement) e.preventDefault()
+})
+
+// روی لینک‌ها و عکس‌ها منوی راست‌کلیک هم بسته بشه
+document.addEventListener('mousedown', (e) => {
+    if (e.button === 2) e.preventDefault()
+})
+
 let currentUser = null
 
 // ==================== تم رنگی ====================

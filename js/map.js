@@ -63,8 +63,8 @@ export function initMap(user) {
         if (sharingMarker) { map.removeLayer(sharingMarker); sharingMarker = null }
         if (sharingTimer) { clearInterval(sharingTimer); sharingTimer = null }
         sharingStartTime = null; updateShareButton()
-        var old = allPins.find(function(x) { return x.id === 'share-'+String(cu.id) }); if (old && old.marker) map.removeLayer(old.marker)
-        allPins = allPins.filter(function(x) { return x.id !== 'share-'+String(cu.id) })
+        var old = allPins.find(function(x) { return x.id === 'share-' + String(cu ? cu.id : '') }); if (old && old.marker) map.removeLayer(old.marker)
+        allPins = allPins.filter(function(x) { return x.id !== 'share-' + String(cu ? cu.id : '') })
         window.showToast('اشتراک متوقف شد', 'info')
     }
 
@@ -90,6 +90,10 @@ export function initMap(user) {
         if (!share.active) return
         sharingActive = true; sharingStartTime = new Date(share.created_at).getTime()
         if (share.lat && share.lng) { userLocation = { lat: share.lat, lng: share.lng }; updateUserMarker() }
+        if (!sharingMarker && userLocation) {
+            var av = cu.avatar || '👤', avImg = (av.indexOf('/')>=0||av.indexOf('.')>=0) ? '<img src="'+av+'" style="width:24px;height:24px;border-radius:50%;object-fit:cover;vertical-align:middle;margin-left:4px;">' : av
+            sharingMarker = L.marker(userLocation, { icon: L.divIcon({ html: '<div style="width:20px;height:20px;background:#2ed573;border:3px solid #fff;border-radius:50%;"></div>', className: 'sharing-marker', iconSize: [20,20] }) }).addTo(map).bindPopup('<div style="text-align:center;"><b>'+avImg+' '+(cu.name||'من')+'</b><br><span style="color:#2ed573;">🟢 اشتراک</span><br><small id="sharing-timer-display">۰:۰۰</small></div>')
+        }
         updateShareButton(); sharingTimer = setInterval(updateSharingTimer, 1000)
     }
 

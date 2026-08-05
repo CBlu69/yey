@@ -20,14 +20,24 @@ export function initPresence() {
     heartbeatTimer = setInterval(heartbeat, HEARTBEAT_MS)
 
     document.addEventListener('visibilitychange', () => {
-        if (!document.hidden) heartbeat()
+        if (!document.hidden) { heartbeat(); refreshPresence(presenceUpdated) }
     })
     window.addEventListener('beforeunload', () => reportOffline())
+    window.addEventListener('online', () => { heartbeat(); refreshPresence(presenceUpdated) })
+    window.addEventListener('offline', () => presenceUpdated())
     navigator.connection?.addEventListener?.('change', () => { if (navigator.onLine) heartbeat() })
 
     watch()
     renderDots()
     dotTimer = setInterval(() => { renderDots(); updateMembersModal() }, 5000)
+    // پشتیبان: حتی اگر رویداد ریل‌تایم نیاد، هر ۳۰ ثانیه وضعیت رو تازه می‌کنه
+    setInterval(() => refreshPresence(presenceUpdated), 30000)
+}
+
+function presenceUpdated() {
+    renderDots()
+    updateMembersModal()
+    window.dispatchEvent(new CustomEvent('presence-update'))
 }
 
 async function heartbeat() {
@@ -76,11 +86,7 @@ function watch() {
     if (channel) return
     channel = supabase.channel('user-presence-live')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'user_presence' }, () => {
-            refreshPresence(() => {
-                renderDots()
-                updateMembersModal()
-                window.dispatchEvent(new CustomEvent('presence-update'))
-            })
+            refreshPresence(presenceUpdated)
         })
         .subscribe()
     refreshPresence()
