@@ -17,6 +17,8 @@ let voiceSchemaChecked = false
 let voiceHasChatContext = false
 let typingChannel = null
 let typingStopTimeout = null
+let onlineUsers = {}
+let presenceChannel = null
 
 function getChatKey() {
     return currentChatType === 'group' ? `group-${currentGroupId}` : `private-${currentReceiverId}`
@@ -78,6 +80,8 @@ export function initChat(user) {
     setupAttachButton()
     setupTypingIndicator()
     setupChatFileInput()
+    setupPresence()
+
 
     if (messagesWrapper && scrollBtn) {
         messagesWrapper.addEventListener('scroll', () => {
@@ -350,9 +354,9 @@ export function initChat(user) {
         pinDiv.className = 'pinned-message'
         pinDiv.id = `pinned-${msg.id}`
         pinDiv.innerHTML = `
-            <span class="pin-icon">📌</span>
-            <span class="pin-content">${msg.user_name}: ${(msg.content || '').substring(0, 40)}</span>
-            <button class="pin-close" onclick="window.unpinMessage('${msg.id}')">✕</button>`
+    <span class="pin-icon"><img src="assets/icons/pin.png" style="width:14px;height:14px;object-fit:contain;vertical-align:middle;"></span>
+    <span class="pin-content">${msg.user_name}: ${(msg.content || '').substring(0, 40)}</span>
+    <button class="pin-close" onclick="window.unpinMessage('${msg.id}')">✕</button>`
         messagesContainer.parentNode.insertBefore(pinDiv, messagesContainer)
     }
 
@@ -372,7 +376,9 @@ export function initChat(user) {
                 <div class="reaction-picker-grid">
                     ${REACTION_EMOJIS.map(r => `<span class="reaction-emoji" data-emoji="${r}">${r}</span>`).join('')}
                 </div>
-                <button class="reaction-remove-all" onclick="window.removeAllMyReactions('${msgId}'); this.closest('.reaction-picker-overlay')?.remove();">🗑️ حذف واکنش‌های من</button>
+<button class="reaction-remove-all" onclick="window.removeAllMyReactions('${msgId}'); this.closest('.reaction-picker-overlay')?.remove();">
+    <img src="assets/icons/delete.png" style="width:14px;height:14px;object-fit:contain;vertical-align:middle;margin-left:4px;"> حذف واکنش‌های من
+</button>
             </div>`
         document.body.appendChild(overlay)
 
@@ -705,7 +711,9 @@ export function initChat(user) {
         div.innerHTML = `
             <div class="sender">${getAvatarHTML(avatar)} ${msg.user_name || 'ناشناس'}</div>
             <div class="voice-message">
-                <button class="voice-play-btn" data-voice-id="${msg.id}" onclick="window.playVoice(this, '${msg.audio_url}')">▶️</button>
+<button class="voice-play-btn" data-voice-id="${msg.id}" onclick="window.playVoice(this, '${msg.audio_url}')">
+    <img src="assets/icons/play.png" style="width:16px;height:16px;object-fit:contain;">
+</button>
                 <div class="voice-player">
                     <div class="voice-wave">
                         <div class="voice-wave-bars">${bars}</div>
@@ -732,10 +740,10 @@ export function initChat(user) {
         const menu = document.createElement('div')
         menu.className = 'message-menu'
         menu.innerHTML = `
-            <div class="menu-item" data-action="reply">↩️ <span>پاسخ</span></div>
-            <div class="menu-item" data-action="react">😀 <span>ری‌اکشن</span></div>
-            ${isSent || isAdmin() ? `<div class="menu-item danger" data-action="delete">🗑️ <span>حذف</span></div>` : ''}
-        `
+    <div class="menu-item" data-action="reply"><img src="assets/icons/reply.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>پاسخ</span></div>
+    <div class="menu-item" data-action="react"><img src="assets/icons/reaction.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>ری‌اکشن</span></div>
+    ${isSent || isAdmin() ? `<div class="menu-item danger" data-action="delete"><img src="assets/icons/delete.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>حذف</span></div>` : ''}
+`
         positionContextMenu(menu, msgEl)
         setupMenuClose(menu)
 
@@ -828,9 +836,10 @@ export function initChat(user) {
 
     function setVoiceBtn(btn, playing) {
         btn.classList.toggle('playing', playing)
-        btn.textContent = playing ? '⏸' : '▶️'
+        btn.innerHTML = playing
+            ? '<img src="assets/icons/pause.png" style="width:16px;height:16px;object-fit:contain;">'
+            : '<img src="assets/icons/play.png" style="width:16px;height:16px;object-fit:contain;">'
     }
-
     // ==================== نظرسنجی ====================
     function setupPollButton() {
         document.getElementById('poll-btn')?.addEventListener('click', openPollCreator)
@@ -841,19 +850,20 @@ export function initChat(user) {
         overlay.className = 'modal-overlay'
         overlay.innerHTML = `
             <div class="custom-modal" style="max-width:450px;">
-                <span class="modal-icon">📊</span>
-                <div class="modal-title">نظرسنجی جدید</div>
+<span class="modal-icon"><img src="assets/icons/poll.png" style="width:40px;height:40px;object-fit:contain;"></span>                <div class="modal-title">نظرسنجی جدید</div>
                 <div class="modal-message">
                     <input type="text" id="poll-question" class="prompt-input" placeholder="سوال..." style="margin-bottom:12px;">
                     <div id="poll-options-container">
                         <input type="text" class="poll-option-input prompt-input" placeholder="گزینه ۱" style="margin-bottom:8px;">
                         <input type="text" class="poll-option-input prompt-input" placeholder="گزینه ۲" style="margin-bottom:8px;">
                     </div>
-                    <button class="modal-btn cancel" id="add-poll-option" style="width:100%;margin-bottom:12px;">➕ افزودن گزینه</button>
-                </div>
+<button class="modal-btn cancel" id="add-poll-option" style="width:100%;margin-bottom:12px;">
+    <img src="assets/icons/add.png" style="width:14px;height:14px;object-fit:contain;vertical-align:middle;margin-left:4px;"> افزودن گزینه
+</button>                </div>
                 <div class="modal-buttons">
-                    <button class="modal-btn primary" id="create-poll-btn">📊 ایجاد</button>
-                    <button class="modal-btn cancel" onclick="this.closest('.modal-overlay').remove()">لغو</button>
+<button class="modal-btn primary" id="create-poll-btn">
+    <img src="assets/icons/poll.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> ایجاد
+</button>                    <button class="modal-btn cancel" onclick="this.closest('.modal-overlay').remove()">لغو</button>
                 </div>
             </div>`
         document.body.appendChild(overlay)
@@ -895,11 +905,11 @@ export function initChat(user) {
         const menu = document.createElement('div')
         menu.className = 'message-menu attach-menu'
         menu.innerHTML = `
-            <div class="menu-item" data-action="file">📁 <span>عکس / فایل</span></div>
-            <div class="menu-item" data-action="poll">📊 <span>نظرسنجی</span></div>
-            <div class="menu-item" data-action="location">📍 <span>اشتراک موقعیت</span></div>
-            <div class="menu-item" data-action="memory">🖼️ <span>خاطره جدید</span></div>
-        `
+    <div class="menu-item" data-action="file"><img src="assets/icons/attach-file.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>عکس / فایل</span></div>
+    <div class="menu-item" data-action="poll"><img src="assets/icons/poll.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>نظرسنجی</span></div>
+    <div class="menu-item" data-action="location"><img src="assets/icons/location.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>اشتراک موقعیت</span></div>
+    <div class="menu-item" data-action="memory"><img src="assets/icons/memory.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>خاطره جدید</span></div>
+`
         const btn = document.getElementById('attach-btn')
         const rect = btn.getBoundingClientRect()
         document.body.appendChild(menu)
@@ -1014,12 +1024,14 @@ export function initChat(user) {
         overlay.className = 'modal-overlay'
         overlay.innerHTML = `
             <div class="custom-modal" style="max-width:460px;">
-                <span class="modal-icon">📍</span>
+<span class="modal-icon"><img src="assets/icons/location.png" style="width:40px;height:40px;object-fit:contain;"></span>
                 <div class="modal-title">ارسال موقعیت</div>
                 <div class="modal-message">مکان‌ت رو روی نقشه انتخاب کن</div>
                 <div id="location-pick-map" style="height:260px;border-radius:14px;overflow:hidden;margin-bottom:12px;direction:ltr;"></div>
                 <div class="modal-buttons">
-                    <button class="modal-btn primary" id="loc-send-btn">📮 ارسال موقعیت</button>
+<button class="modal-btn primary" id="loc-send-btn">
+    <img src="assets/icons/send-location.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> ارسال موقعیت
+</button>
                     <button class="modal-btn cancel" id="loc-cancel-btn">لغو</button>
                 </div>
             </div>`
@@ -1114,12 +1126,14 @@ export function initChat(user) {
         overlay.className = 'modal-overlay'
         overlay.innerHTML = `
             <div class="custom-modal" style="max-width:520px;width:92vw;max-height:85vh;display:flex;flex-direction:column;">
-                <span class="modal-icon">🔍</span>
-                <div class="modal-title">جستجو در پیام‌ها</div>
+<span class="modal-icon"><img src="assets/icons/search.png" style="width:40px;height:40px;object-fit:contain;"></span>                <div class="modal-title">جستجو در پیام‌ها</div>
                 <input type="text" id="chat-search-input" class="prompt-input" placeholder="کلمه‌ای بنویس..." autofocus style="margin-bottom:12px;">
                 <div id="chat-search-results" style="flex:1;overflow-y:auto;text-align:right;min-height:120px;"></div>
                 <div class="modal-buttons">
-                    <button class="modal-btn primary" id="chat-search-btn">جستجو</button>
+
+<button class="modal-btn primary" id="chat-search-btn">
+    <img src="assets/icons/search.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> جستجو
+</button>
                     <button class="modal-btn cancel" id="chat-search-close">بستن</button>
                 </div>
             </div>`
@@ -1248,8 +1262,7 @@ export function initChat(user) {
             <div class="poll-footer">
                 <span>${totalVotes} رأی</span>
                 <span>توسط ${poll.created_by}</span>
-                ${canDelete ? `<button onclick="window.deletePoll('${pollId}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:2px 8px;">🗑️</button>` : ''}
-            </div>`
+${canDelete ? `<button onclick="window.deletePoll('${pollId}')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px;padding:2px 8px;"><img src="assets/icons/delete.png" style="width:14px;height:14px;object-fit:contain;"></button>` : ''}            </div>`
     }
 
     window.votePoll = async (pollId, optionIndex) => {
@@ -1340,13 +1353,13 @@ export function initChat(user) {
         const menu = document.createElement('div')
         menu.className = 'message-menu'
         menu.innerHTML = `
-            <div class="menu-item" data-action="reply">↩️ <span>پاسخ</span></div>
-            <div class="menu-item" data-action="react">😀 <span>ری‌اکشن</span></div>
-            <div class="menu-item" data-action="copy">📋 <span>کپی</span></div>
-            ${currentChatType === 'group' ? `<div class="menu-item" data-action="pin">📌 <span>پین</span></div>` : ''}
-            ${isSent ? `<div class="menu-item" data-action="edit">✏️ <span>ویرایش</span></div>` : ''}
-            ${isSent || isAdmin() ? `<div class="menu-item danger" data-action="delete">🗑️ <span>حذف</span></div>` : ''}
-        `
+    <div class="menu-item" data-action="reply"><img src="assets/icons/reply.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>پاسخ</span></div>
+    <div class="menu-item" data-action="react"><img src="assets/icons/reaction.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>ری‌اکشن</span></div>
+    <div class="menu-item" data-action="copy"><img src="assets/icons/copy.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>کپی</span></div>
+    ${currentChatType === 'group' ? `<div class="menu-item" data-action="pin"><img src="assets/icons/pin.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>پین</span></div>` : ''}
+    ${isSent ? `<div class="menu-item" data-action="edit"><img src="assets/icons/edit.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>ویرایش</span></div>` : ''}
+    ${isSent || isAdmin() ? `<div class="menu-item danger" data-action="delete"><img src="assets/icons/delete.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> <span>حذف</span></div>` : ''}
+`
         positionContextMenu(menu, msgEl)
         setupMenuClose(menu)
 
@@ -1464,7 +1477,7 @@ export function initChat(user) {
             input.focus()
             const btn = document.getElementById('chat-form')?.querySelector('button[type="submit"]')
             if (btn) {
-                btn.innerHTML = '✏️'
+                btn.innerHTML = '<img src="assets/icons/edit.png" style="width:16px;height:16px;object-fit:contain;">'
                 btn.style.background = '#ffa502'
             }
         }
@@ -1553,8 +1566,8 @@ export function initChat(user) {
         currentReceiverId = receiverId
         currentGroupId = null
         const info = USERS_DATABASE[receiverName] || { avatar: '👤' }
-        if (chatHeader) chatHeader.innerHTML = `${getAvatarHTML(info.avatar, 24)} ${receiverName}`
-        document.querySelector('.pinned-message')?.remove()
+        const isOnline = !!onlineUsers[receiverId]
+        if (chatHeader) chatHeader.innerHTML = `${getAvatarHTML(info.avatar, 24)} ${receiverName} <span class="online-status ${isOnline ? 'online' : 'offline'}">${isOnline ? '🟢' : '⚫'}</span>`
         clearUnreadFromDB(`private-${receiverId}`)
         loadMessages()
     }
@@ -1625,7 +1638,7 @@ export function initChat(user) {
         ].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
         messagesContainer.innerHTML = ''
         if (all.length > 0) all.forEach((msg, i) => msg.kind === 'voice' ? displayVoiceMessage(msg, i) : displayMessage(msg, i))
-        else messagesContainer.innerHTML = '<div style="text-align:center;color:#9d9dab;padding:40px;"><span style="font-size:40px;">💬</span><p>پیامی نیست</p></div>'
+        else messagesContainer.innerHTML = '<div style="text-align:center;color:#9d9dab;padding:40px;"><img src="assets/icons/empty-chat.png" style="width:40px;height:40px;object-fit:contain;display:block;margin:0 auto 12px;"><p>پیامی نیست</p></div>'
         scrollToBottom()
 
         if (currentChatType === 'group') loadPolls()
@@ -1644,7 +1657,9 @@ export function initChat(user) {
             <div class="chat-tabs" id="chat-tabs">
                 ${(groups || []).map(g => `
                     <div class="chat-tab-wrapper">
-                        <button class="chat-tab ${g.id === currentGroupId ? 'active' : ''}" data-group="${g.id}" onclick="window.switchToGroup('${g.id}', '${g.name}')">👥 ${g.name}</button>
+<button class="chat-tab ${g.id === currentGroupId ? 'active' : ''}" data-group="${g.id}" onclick="window.switchToGroup('${g.id}', '${g.name}')">
+    <img src="assets/icons/group.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;margin-left:4px;"> ${g.name}
+</button>
                         ${admin ? `<button class="delete-group-btn" onclick="event.stopPropagation(); window.deleteGroup('${g.id}', '${g.name}')" title="حذف">×</button>` : ''}
                     </div>`).join('')}
                 ${ALLOWED_USERS.filter(n => n !== currentUserName).map(name => {
@@ -1653,7 +1668,9 @@ export function initChat(user) {
             return `<button class="chat-tab" data-user="${info.id}" onclick="window.switchToPrivateChat('${info.id}', '${name}'); document.querySelectorAll('.chat-tab').forEach(b=>b.classList.remove('active')); this.classList.add('active');">${getAvatarHTML(info.avatar, 20)} ${name}</button>`
         }).join('')}
                 ${admin ? `<button class="chat-tab admin-tab" onclick="window.showCreateGroupModal()" title="ساخت گروه جدید">➕</button>` : ''}
-                <button class="chat-tab" onclick="window.showMembers()" title="اعضا و حضور">👥 اعضا</button>
+<button class="chat-tab" onclick="window.showMembers()" title="اعضا و حضور">
+    <img src="assets/icons/group.png" style="width:16px;height:16px;object-fit:contain;vertical-align:middle;">
+</button>
             </div>`
         const headerEl = document.querySelector('.chat-header')
         if (headerEl) headerEl.after(selector)
@@ -1665,8 +1682,7 @@ export function initChat(user) {
         overlay.className = 'modal-overlay'
         overlay.innerHTML = `
             <div class="custom-modal" style="max-width:450px;">
-                <span class="modal-icon">👥</span>
-                <div class="modal-title">ساخت گروه جدید</div>
+<span class="modal-icon"><img src="assets/icons/group.png" style="width:40px;height:40px;object-fit:contain;"></span>                <div class="modal-title">ساخت گروه جدید</div>
                 <div class="modal-message">
                     <input type="text" id="new-group-name" class="prompt-input" placeholder="اسم گروه..." style="margin-bottom:12px;">
                     <div style="text-align:right;max-height:200px;overflow-y:auto;">
@@ -1709,5 +1725,25 @@ export function initChat(user) {
     window.refreshGroups = async () => {
         document.querySelector('.chat-selector')?.remove()
         await setupGroupSelector()
+    }
+    // ==================== حضور آنلاین/آفلاین ====================
+    function setupPresence() {
+        const cu = getCurrentUser(); if (!cu || presenceChannel) return
+        presenceChannel = supabase.channel('online-users', { config: { presence: { key: String(cu.id) } } })
+        presenceChannel.on('presence', { event: 'sync' }, () => { const s = presenceChannel.presenceState(); onlineUsers = {}; Object.values(s).forEach(e => e.forEach(p => { if (p.online) onlineUsers[p.user_id] = { name: p.user_name, avatar: p.user_avatar } })); updateOnlineBadges() })
+        presenceChannel.on('presence', { event: 'join' }, ({ newPresences }) => { newPresences.forEach(p => { if (p.online) onlineUsers[p.user_id] = { name: p.user_name, avatar: p.user_avatar } }); updateOnlineBadges() })
+        presenceChannel.on('presence', { event: 'leave' }, ({ leftPresences }) => { leftPresences.forEach(p => delete onlineUsers[p.user_id]); updateOnlineBadges() })
+        presenceChannel.subscribe(async status => { if (status === 'SUBSCRIBED') await presenceChannel.track({ user_id: String(cu.id), user_name: cu.name, user_avatar: cu.avatar || '👤', online: true }) })
+        setInterval(async () => { if (presenceChannel) { const cu = getCurrentUser(); if (cu) await presenceChannel.track({ user_id: String(cu.id), user_name: cu.name, user_avatar: cu.avatar || '👤', online: true }) } }, 10000)
+        window.addEventListener('beforeunload', () => { if (presenceChannel) { const cu = getCurrentUser(); if (cu) presenceChannel.track({ user_id: String(cu.id), user_name: cu.name, user_avatar: cu.avatar || '👤', online: false }) } })
+    }
+
+    function updateOnlineBadges() {
+        document.querySelectorAll('.chat-tab[data-user]').forEach(tab => {
+            const userId = tab.dataset.user, isOnline = !!onlineUsers[userId]
+            let badge = tab.querySelector('.online-dot')
+            if (isOnline) { if (!badge) { badge = document.createElement('span'); badge.className = 'online-dot'; tab.appendChild(badge) } }
+            else { if (badge) badge.remove() }
+        })
     }
 }

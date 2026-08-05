@@ -36,8 +36,7 @@ function setupThemePicker() {
         overlay.className = 'modal-overlay'
         overlay.innerHTML = `
             <div class="custom-modal" style="max-width:420px;">
-                <span class="modal-icon">🎨</span>
-                <div class="modal-title">تم رنگی</div>
+<span class="modal-icon"><img src="assets/icons/theme.png" style="width:40px;height:40px;object-fit:contain;"></span>
                 <div class="modal-message">یه تم انتخاب کن:</div>
                 <div class="theme-grid">
                     ${THEMES.map(t => `<button class="theme-swatch ${t === current ? 'active' : ''}" data-theme="${t}"></button>`).join('')}
